@@ -35,23 +35,37 @@ interface UserProviderProps {
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  // Restore user session on mount
+  // Listen for Supabase auth state changes and restore user
   React.useEffect(() => {
-    const restoreSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session && session.user) {
         // Fetch user data from your users table
-        const { data: userData, error } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('*')
           .eq('email', session.user.email)
           .single();
-        if (userData) {
-          setUser(userData as User);
-        }
+        if (userData) setUser(userData as User);
+      } else {
+        setUser(null);
       }
+    });
+    // On mount, also check for an existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && session.user) {
+        supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email)
+          .single()
+          .then(({ data: userData }) => {
+            if (userData) setUser(userData as User);
+          });
+      }
+    });
+    return () => {
+      listener?.subscription.unsubscribe();
     };
-    restoreSession();
   }, []);
 
   const login = async (email: string, password: string, role: string): Promise<{ success: boolean; error?: string }> => {
