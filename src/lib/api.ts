@@ -387,15 +387,14 @@ export const sessionApi = {
     beacon_id?: string; // in case beacon assignment is present
   }) {
     // Log all values being sent to the API
-    console.log('[Session Creation] Sending values:', {
-      course_id: sessionData.course_id,
-      session_date: sessionData.session_date,
-      start_time: sessionData.start_time,
-      end_time: sessionData.end_time,
-      attendance_window_start: sessionData.attendance_window_start,
-      attendance_window_end: sessionData.attendance_window_end,
-      beacon_id: sessionData.beacon_id,
-      location: sessionData.location
+    console.log('Creating session with:', {
+      courseId: sessionData.course_id,
+      session_date: sessionData.session_date,           // e.g., "2025-07-17"
+      start_time: sessionData.start_time,               // e.g., "19:19"
+      end_time: sessionData.end_time,                   // e.g., "20:20"
+      attendance_window_start: sessionData.attendance_window_start, // e.g., "19:19"
+      attendance_window_end: sessionData.attendance_window_end,     // e.g., "20:00"
+      beacon_id: sessionData.beacon_id                  // UUID of the beacon
     });
     const { data, error } = await supabase
       .from('class_sessions')
