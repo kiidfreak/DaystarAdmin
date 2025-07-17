@@ -17,6 +17,7 @@ import { LiveClasses } from '@/components/dashboard/LiveClasses';
 import { LecturerLiveAttendance } from '@/components/dashboard/LecturerLiveAttendance';
 import { StudentsPage } from '@/components/dashboard/StudentsPage';
 import { StudentCourseAssignment } from '@/components/dashboard/StudentCourseAssignment';
+import { StudentDashboard } from '@/components/dashboard/StudentDashboard';
 import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTodayAttendance, useDashboardStats, useUpdateAttendanceStatus } from '@/hooks/use-api';
@@ -100,13 +101,13 @@ const Index = () => {
 
   const getPageTitle = () => {
     const titles = {
-      dashboard: 'Dashboard Overview',
+      dashboard: userRole === 'student' ? 'My Dashboard' : 'Dashboard Overview',
       classes: 'All Courses',
-      attendance: 'Live Attendance',
+      attendance: userRole === 'student' ? 'My Attendance' : 'Live Attendance',
       'qr-generator': 'QR Code Generator',
       sessions: 'Session Manager',
       beacons: 'BLE Beacon Manager',
-      reports: 'Attendance Reports',
+      reports: userRole === 'student' ? 'My Reports' : 'Attendance Reports',
       analytics: 'System Analytics',
       students: 'All Students',
       users: 'User Management',
@@ -153,64 +154,88 @@ const Index = () => {
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div onClick={() => handleMetricCardClick('all')} className="cursor-pointer">
-                <MetricCard 
-                  title="Total Students" 
-                  value={stats?.totalStudents.toString() || '0'} 
-                  change="0%"
-                  trend="up" 
-                  icon={Users} 
-                  color="blue"
-                />
-              </div>
-              <div onClick={() => handleMetricCardClick('present')} className="cursor-pointer">
-                <MetricCard 
-                  title="Present Today" 
-                  value={stats?.presentStudents.toString() || '0'} 
-                  change="0%"
-                  trend="up" 
-                  icon={Calendar} 
-                  color="green"
-                />
-              </div>
-              <MetricCard 
-                title="Attendance Rate" 
-                value={`${stats?.attendanceRate || 0}%`}
-                change="0%"
-                trend="up" 
-                icon={Clock} 
-                color="blue"
-              />
-              <div onClick={() => setActiveTab('classes')} className="cursor-pointer">
-                <MetricCard 
-                  title="Classes Today" 
-                  value={stats?.classesToday.toString() || '0'} 
-                  change="0%"
-                  trend="up" 
-                  icon={BookOpen} 
-                  color="yellow"
-                />
-              </div>
-            </div>
-            
-            {userRole === 'admin' ? (
-              <LiveClasses />
-            ) : userRole === 'lecturer' ? (
-              <LecturerLiveAttendance lecturerId={user?.id || ''} />
+            {userRole === 'student' ? (
+              <StudentDashboard />
             ) : (
-              <AttendanceTable 
-                students={(attendanceData || []).map(transformAttendanceToStudent)} 
-                onApprove={handleApprove}
-                onReject={handleReject}
-                userRole={userRole}
-                showSearch={true}
-              />
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div onClick={() => handleMetricCardClick('all')} className="cursor-pointer">
+                    <MetricCard 
+                      title="Total Students" 
+                      value={stats?.totalStudents.toString() || '0'} 
+                      change="0%"
+                      trend="up" 
+                      icon={Users} 
+                      color="blue"
+                    />
+                  </div>
+                  <div onClick={() => handleMetricCardClick('present')} className="cursor-pointer">
+                    <MetricCard 
+                      title="Present Today" 
+                      value={stats?.presentStudents.toString() || '0'} 
+                      change="0%"
+                      trend="up" 
+                      icon={Calendar} 
+                      color="green"
+                    />
+                  </div>
+                  <MetricCard 
+                    title="Attendance Rate" 
+                    value={`${stats?.attendanceRate || 0}%`}
+                    change="0%"
+                    trend="up" 
+                    icon={Clock} 
+                    color="blue"
+                  />
+                  <div onClick={() => setActiveTab('classes')} className="cursor-pointer">
+                    <MetricCard 
+                      title="Classes Today" 
+                      value={stats?.classesToday.toString() || '0'} 
+                      change="0%"
+                      trend="up" 
+                      icon={BookOpen} 
+                      color="yellow"
+                    />
+                  </div>
+                </div>
+                
+                {userRole === 'admin' ? (
+                  <LiveClasses />
+                ) : userRole === 'lecturer' ? (
+                  <LecturerLiveAttendance lecturerId={user?.id || ''} />
+                ) : (
+                  <AttendanceTable 
+                    students={(attendanceData || []).map(transformAttendanceToStudent)} 
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    userRole={userRole}
+                    showSearch={true}
+                  />
+                )}
+              </>
             )}
           </div>
         );
       
       case 'attendance':
+        if (userRole === 'student') {
+          return (
+            <div className="space-y-8">
+              <div className="glass-card p-6">
+                <h2 className="text-xl font-bold text-white mb-4">My Attendance</h2>
+                <p className="text-gray-400">View your attendance records and statistics</p>
+              </div>
+              <AttendanceTable 
+                students={getFilteredStudentsForTable()} 
+                onApprove={handleApprove}
+                onReject={handleReject}
+                userRole={userRole}
+                showSearch={true}
+                globalSearchTerm={globalSearchTerm}
+              />
+            </div>
+          );
+        }
         return (
           <AttendanceTable 
             students={getFilteredStudentsForTable()} 

@@ -209,6 +209,30 @@ export const coursesApi = {
     
     if (studentsError) throw studentsError;
     return students || [];
+  },
+
+  async getStudentEnrollments(studentId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('student_course_enrollments')
+      .select(`
+        *,
+        courses!student_course_enrollments_course_id_fkey (
+          id,
+          name,
+          code,
+          department,
+          users!courses_instructor_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('status', 'active');
+    
+    if (error) throw error;
+    return data || [];
   }
 };
 
@@ -360,7 +384,19 @@ export const sessionApi = {
     location?: string;
     attendance_window_start?: string;
     attendance_window_end?: string;
+    beacon_id?: string; // in case beacon assignment is present
   }) {
+    // Log all values being sent to the API
+    console.log('[Session Creation] Sending values:', {
+      course_id: sessionData.course_id,
+      session_date: sessionData.session_date,
+      start_time: sessionData.start_time,
+      end_time: sessionData.end_time,
+      attendance_window_start: sessionData.attendance_window_start,
+      attendance_window_end: sessionData.attendance_window_end,
+      beacon_id: sessionData.beacon_id,
+      location: sessionData.location
+    });
     const { data, error } = await supabase
       .from('class_sessions')
       .insert([sessionData])

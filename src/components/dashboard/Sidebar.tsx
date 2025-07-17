@@ -29,6 +29,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
     ];
 
     const roleSpecificItems = {
+      student: [
+        { id: 'attendance', label: 'My Attendance', icon: Users },
+        { id: 'reports', label: 'My Reports', icon: Clock },
+      ],
       lecturer: [
         { id: 'attendance', label: 'Live Attendance', icon: Users },
         { id: 'qr-generator', label: 'QR Generator', icon: Monitor },

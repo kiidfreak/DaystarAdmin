@@ -107,11 +107,11 @@ export const QRGenerator: React.FC = () => {
           if (time <= 1) {
             setActiveQRCode(null);
             queryClient.invalidateQueries({ queryKey: ['active-qr', selectedCourse] });
-            toast({
-              title: "QR Code Expired",
-              description: "Generate a new QR code for continued access",
-              variant: "destructive",
-            });
+      toast({
+        title: "QR Code Expired",
+        description: "Generate a new QR code for continued access",
+        variant: "destructive",
+      });
             return 0;
           }
           return time - 1;
