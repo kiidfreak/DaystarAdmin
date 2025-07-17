@@ -35,6 +35,25 @@ interface UserProviderProps {
 export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
+  // Restore user session on mount
+  React.useEffect(() => {
+    const restoreSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) {
+        // Fetch user data from your users table
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
+        if (userData) {
+          setUser(userData as User);
+        }
+      }
+    };
+    restoreSession();
+  }, []);
+
   const login = async (email: string, password: string, role: string): Promise<{ success: boolean; error?: string }> => {
     try {
       // First, try to authenticate with Supabase Auth
