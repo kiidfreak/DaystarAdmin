@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 import { PageLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
+import { sessionApi } from '@/lib/api';
 
 type ClassSession = Database['public']['Tables']['class_sessions']['Row'];
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -106,25 +107,18 @@ export const SessionManager: React.FC = () => {
   // Create session mutation
   const createSession = useMutation({
     mutationFn: async (sessionData: SessionFormData) => {
-      // Format the session data properly for the database
+      // Format the session data properly for the API
       const formattedData = {
         course_id: sessionData.course_id,
-        session_date: `${sessionData.session_date}T00:00:00+00`, // Convert to timestamp with timezone
-        start_time: sessionData.start_time, // Keep as time string for time field
-        end_time: sessionData.end_time, // Keep as time string for time field
+        session_date: `${sessionData.session_date}T00:00:00+00`,
+        start_time: sessionData.start_time,
+        end_time: sessionData.end_time,
         location: sessionData.location || null,
-        attendance_window_start: sessionData.attendance_window_start ? `${sessionData.session_date} ${sessionData.attendance_window_start}:00` : null, // Convert to timestamp
-        attendance_window_end: sessionData.attendance_window_end ? `${sessionData.session_date} ${sessionData.attendance_window_end}:00` : null, // Convert to timestamp
+        attendance_window_start: sessionData.attendance_window_start ? `${sessionData.session_date} ${sessionData.attendance_window_start}:00` : null,
+        attendance_window_end: sessionData.attendance_window_end ? `${sessionData.session_date} ${sessionData.attendance_window_end}:00` : null,
       };
-
-      const { data, error } = await supabase
-        .from('class_sessions')
-        .insert([formattedData])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
+      // Use the shared API function (this will trigger the log)
+      return await sessionApi.createSession(formattedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lecturer-sessions'] });
