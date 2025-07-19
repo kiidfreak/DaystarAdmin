@@ -396,14 +396,25 @@ export const sessionApi = {
       attendance_window_end: sessionData.attendance_window_end,     // e.g., "20:00"
       beacon_id: sessionData.beacon_id                  // UUID of the beacon
     });
-    const { data, error } = await supabase
-      .from('class_sessions')
-      .insert([sessionData])
-      .select()
-      .single();
     
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('class_sessions')
+        .insert([sessionData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
+      
+      console.log('Session created successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
   },
 
   async getSessionsByCourse(courseId: string) {
@@ -707,8 +718,8 @@ export const mobileBeaconApi = {
         `)
         .eq('beacon_id', beacon.id)
         .eq('session_date', today)
-        .gte('start_time', currentTime)
-        .lte('end_time', currentTime)
+        .lte('start_time', currentTime)  // Session has started (start_time <= current_time)
+        .gte('end_time', currentTime)    // Session hasn't ended yet (end_time >= current_time)
         .order('start_time');
       
       if (error) {
