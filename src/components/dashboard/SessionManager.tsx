@@ -400,57 +400,14 @@ export const SessionManager: React.FC = () => {
   };
 
   const getSessionStatus = (session: ClassSession) => {
-    const now = dayjs(); // Use local time for display
-    const sessionDate = dayjs.utc(session.session_date).local(); // Convert UTC to local
-    const today = dayjs().startOf('day');
-    
-    // Debug: Log current time and session details
-    console.log(`Status check for session ${session.id}:`, {
-      currentTime: now.format('YYYY-MM-DD HH:mm:ss'),
-      sessionDate: sessionDate.format('YYYY-MM-DD'),
-      sessionStartTime: session.start_time,
-      sessionEndTime: session.end_time,
-      isToday: sessionDate.isSame(today, 'day')
-    });
-    
-    // Debug: Check if this is a session from today
-    if (sessionDate.isSame(today, 'day')) {
-      console.log(`TODAY'S SESSION FOUND: ${session.id} with times ${session.start_time} - ${session.end_time}`);
-      
-      // Specific debug for the problematic session
-      if (session.id === '56a45030-4043-42b3-af80-9edcd5dfca80') {
-        console.log(`DEBUGGING SPECIFIC SESSION: ${session.id}`);
-        console.log(`Current time: ${now.format('HH:mm:ss')}`);
-        console.log(`Session times: ${session.start_time} - ${session.end_time}`);
-        console.log(`Current minutes: ${now.hour() * 60 + now.minute()}`);
-        console.log(`Start minutes: ${(session.start_time || '00:00').split(':').map(Number).reduce((h, m) => h * 60 + m)}`);
-        console.log(`End minutes: ${(session.end_time || '23:59').split(':').map(Number).reduce((h, m) => h * 60 + m)}`);
-      }
-      
-      // Add debug for ALL today's sessions
-      console.log(`PROCESSING TODAY'S SESSION: ${session.id}`);
-      const currentMinutes = now.hour() * 60 + now.minute();
-      const [startHour, startMinute] = (session.start_time || '00:00').split(':').map(Number);
-      const [endHour, endMinute] = (session.end_time || '23:59').split(':').map(Number);
-      const startMinutes = startHour * 60 + startMinute;
-      const endMinutes = endHour * 60 + endMinute;
-      console.log(`Session: ${session.id}, Current: ${currentMinutes}min, Start: ${startMinutes}min, End: ${endMinutes}min`);
-      console.log(`Time comparison: ${currentMinutes} < ${startMinutes} = ${currentMinutes < startMinutes}, ${currentMinutes} > ${endMinutes} = ${currentMinutes > endMinutes}`);
-      console.log(`Time details: current=${now.format('HH:mm')}, start=${session.start_time}, end=${session.end_time}, startParsed=${startHour}:${startMinute}, endParsed=${endHour}:${endMinute}`);
-      
-      if (currentMinutes < startMinutes) {
-        console.log(`Session ${session.id}: UPCOMING (current ${currentMinutes} < start ${startMinutes})`);
-        return 'upcoming';
-      }
-      if (currentMinutes > endMinutes) {
-        console.log(`Session ${session.id}: COMPLETED (current ${currentMinutes} > end ${endMinutes})`);
-        return 'completed';
-      }
-      console.log(`Session ${session.id}: ONGOING (current ${currentMinutes} between start ${startMinutes} and end ${endMinutes})`);
-      return 'ongoing';
-    }
-    
-    return 'upcoming';
+    const now = new Date();
+    const sessionDate = new Date(session.session_date);
+    const startTime = session.start_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.start_time}`) : null;
+    const endTime = session.end_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.end_time}`) : null;
+    if (!startTime || !endTime) return 'unknown';
+    if (now < startTime) return 'upcoming';
+    if (now >= startTime && now <= endTime) return 'ongoing';
+    return 'completed';
   };
 
   // Sort sessions by priority: current happening first, then upcoming, then completed
