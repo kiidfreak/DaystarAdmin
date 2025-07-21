@@ -534,8 +534,8 @@ export const beaconApi = {
       `)
       .eq('beacon_id', beacon.id)
       .eq('session_date', today)
-      .gte('start_time', currentTime)
-      .lte('end_time', currentTime)
+      .lte('start_time', currentTime)
+      .gte('end_time', currentTime)
       .order('start_time');
     
     if (sessionsError) {

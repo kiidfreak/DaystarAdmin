@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { qrCodeApi } from '@/lib/api';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
+import QRCode from 'react-qr-code';
 
 type Course = Database['public']['Tables']['courses']['Row'];
 type QRCodePrompt = Database['public']['Tables']['check_in_prompts']['Row'] & {
@@ -205,11 +206,12 @@ export const QRGenerator: React.FC = () => {
           {activeQRCode ? (
             <div className="bg-white p-8 rounded-3xl mb-4">
               <div className="w-48 h-48 mx-auto bg-black rounded-2xl flex items-center justify-center">
-                <div className="text-white text-center">
-                  <QrCode className="w-16 h-16 mx-auto mb-2" />
-                  <p className="text-xs break-all">{activeQRCode.id}</p>
-                  <p className="text-xs mt-2">{activeQRCode.course_name}</p>
-                </div>
+                {/* Render a real QR code encoding only the prompt/session ID */}
+                <QRCode value={activeQRCode.id} size={180} bgColor="#000" fgColor="#fff" />
+              </div>
+              <div className="text-center mt-2">
+                <p className="text-xs break-all text-black">{activeQRCode.id}</p>
+                <p className="text-xs mt-2 text-black">{activeQRCode.course_name}</p>
               </div>
             </div>
           ) : (
