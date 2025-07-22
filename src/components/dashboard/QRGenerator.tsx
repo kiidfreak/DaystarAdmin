@@ -194,7 +194,7 @@ export const QRGenerator: React.FC = () => {
               {formatTime(timeLeft)} remaining
             </Badge>
             <p className="text-sm text-gray-400">Course: {activeQRCode.course_name}</p>
-            <p className="text-sm text-gray-400">QR ID: {activeQRCode.id}</p>
+           {/*  <p className="text-sm text-gray-400">QR ID: {activeQRCode.id}</p> */}
           </div>
         )}
       </Card>
@@ -205,13 +205,21 @@ export const QRGenerator: React.FC = () => {
           
           {activeQRCode ? (
             <div className="bg-white p-8 rounded-3xl mb-4">
-              <div className="w-48 h-48 mx-auto bg-black rounded-2xl flex items-center justify-center">
-                <div className="text-white text-center">
-                  {/* Render the real QR code here */}
-                  <QRCodeCanvas value={activeQRCode.id} size={160} bgColor="#000000" fgColor="#ffffff" includeMargin={false} />
-                  <p className="text-xs break-all mt-2">{activeQRCode.id}</p>
-                  <p className="text-xs mt-2">{activeQRCode.course_name}</p>
-                </div>
+              {/* QR Code Container - Full space for scanning */}
+              <div className="w-48 h-48 mx-auto bg-white rounded-2xl flex items-center justify-center mb-4">
+                <QRCodeCanvas 
+                  value={activeQRCode.id} 
+                  size={180} 
+                  bgColor="#ffffff" 
+                  fgColor="#000000" 
+                  includeMargin={false} 
+                />
+              </div>
+              
+              {/* Text information below the QR code */}
+              <div className="text-center">
+             {/*    <p className="text-xs break-all text-black mb-1">{activeQRCode.id}</p> */}
+                <p className="text-xs text-black">{activeQRCode.course_name}</p>
               </div>
             </div>
           ) : (
