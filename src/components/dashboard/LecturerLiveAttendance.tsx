@@ -66,6 +66,7 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
   const [selectedSession, setSelectedSession] = useState<ClassSession | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showLiveAttendance, setShowLiveAttendance] = useState(false);
+  const [attendanceMethodFilter, setAttendanceMethodFilter] = useState<'all' | 'ble' | 'qr'>('all');
 
   // Get lecturer's sessions from past week to next week
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
@@ -247,6 +248,28 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
     return statusFilter === filterValue 
       ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10';
+  };
+
+  const getAttendanceMethodFilterClass = (filterValue: string) => {
+    return attendanceMethodFilter === filterValue 
+      ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+      : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10';
+  };
+
+  const getFilteredLiveAttendance = () => {
+    if (!liveAttendance) return [];
+    
+    let filtered = liveAttendance;
+    
+    // Filter by attendance method
+    if (attendanceMethodFilter !== 'all') {
+      filtered = filtered.filter(record => {
+        const method = record.method?.toLowerCase() || 'manual';
+        return method === attendanceMethodFilter;
+      });
+    }
+    
+    return filtered;
   };
 
   if (sessionsLoading || attendanceLoading) {
@@ -650,10 +673,11 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                 {/* Live Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                   {(() => {
-                    const total = liveAttendance?.length || 0;
-                    const present = liveAttendance?.filter(a => a.status === 'verified').length || 0;
-                    const absent = liveAttendance?.filter(a => a.status === 'absent').length || 0;
-                    const pending = liveAttendance?.filter(a => a.status === 'pending').length || 0;
+                    const filteredAttendance = getFilteredLiveAttendance();
+                    const total = filteredAttendance?.length || 0;
+                    const present = filteredAttendance?.filter(a => a.status === 'verified' || (a.method === 'BLE' && a.status !== 'absent')).length || 0;
+                    const absent = filteredAttendance?.filter(a => a.status === 'absent').length || 0;
+                    const pending = filteredAttendance?.filter(a => a.status === 'pending').length || 0;
                     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
                     return (
@@ -699,6 +723,36 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                   })()}
                 </div>
 
+                {/* Attendance Method Filters */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium text-gray-400">Filter by method:</span>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        onClick={() => setAttendanceMethodFilter('all')}
+                        className={`${getAttendanceMethodFilterClass('all')} rounded-xl px-4 py-2`}
+                      >
+                        All
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setAttendanceMethodFilter('ble')}
+                        className={`${getAttendanceMethodFilterClass('ble')} rounded-xl px-4 py-2`}
+                      >
+                        📡 BLE
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setAttendanceMethodFilter('qr')}
+                        className={`${getAttendanceMethodFilterClass('qr')} rounded-xl px-4 py-2`}
+                      >
+                        📱 QR
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Live Attendance Table */}
                 <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
                   <div className="p-4 border-b border-white/10">
@@ -710,9 +764,11 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto mb-4"></div>
                         <p className="text-gray-400">Loading live attendance...</p>
                       </div>
-                    ) : liveAttendance && liveAttendance.length > 0 ? (
+                    ) : (() => {
+                        const filteredAttendance = getFilteredLiveAttendance();
+                        return filteredAttendance && filteredAttendance.length > 0 ? (
                       <div className="divide-y divide-white/10">
-                        {liveAttendance.map((record) => (
+                        {filteredAttendance.map((record) => (
                           <div key={record.id} className="p-4 hover:bg-white/5 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-4">
@@ -738,6 +794,14 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                                   </div>
                                 </div>
                                 
+                                {/* Checkout Time */}
+                                <div className="text-right">
+                                  <div className="text-sm text-gray-400">Check-out</div>
+                                  <div className={`font-medium ${getStatusColor(record.status)}`}>
+                                    {formatTime(record.check_out_time)}
+                                  </div>
+                                </div>
+                                
                                 {/* Method */}
                                 <div className="text-center">
                                   <div className="text-sm text-gray-400 mb-1">Method</div>
@@ -749,14 +813,15 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                                   <div className="text-sm text-gray-400 mb-1">Status</div>
                                   <Badge 
                                     className={`${
-                                      record.status === 'verified' 
+                                      record.status === 'verified' || (record.method === 'BLE' && record.status !== 'absent')
                                         ? 'bg-green-500/20 text-green-400 border-green-500/30'
                                         : record.status === 'pending'
                                         ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
                                         : 'bg-red-500/20 text-red-400 border-red-500/30'
                                     }`}
                                   >
-                                    {record.status === 'verified' ? '✅ Verified' : 
+                                    {record.method === 'BLE' && record.status !== 'absent' ? '📡 BLE' :
+                                     record.status === 'verified' ? '✅ Verified' : 
                                      record.status === 'pending' ? '⏳ Pending' : '❌ Absent'}
                                   </Badge>
                                 </div>
@@ -784,13 +849,18 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="p-8 text-center">
-                        <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-white mb-2">No Attendance Records</h4>
-                        <p className="text-gray-400">No students have checked in yet for this session.</p>
-                      </div>
-                    )}
+                        ) : (
+                          <div className="p-8 text-center">
+                            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                            <h4 className="text-lg font-semibold text-white mb-2">No Attendance Records</h4>
+                            <p className="text-gray-400">
+                              {attendanceMethodFilter === 'all' 
+                                ? 'No students have checked in yet for this session.' 
+                                : `No students have checked in using ${attendanceMethodFilter.toUpperCase()} method.`}
+                            </p>
+                          </div>
+                        );
+                      })()}
                   </div>
                 </div>
 

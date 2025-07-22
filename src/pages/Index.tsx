@@ -129,6 +129,11 @@ const Index = () => {
       minute: '2-digit',
       hour12: true 
     }) : undefined,
+    checkOutTime: attendance.check_out_time ? new Date(attendance.check_out_time).toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    }) : undefined,
     method: (attendance.method === 'MANUAL' ? 'QR' : attendance.method) as 'BLE' | 'QR' | 'Absent',
     status: attendance.status as 'verified' | 'pending' | 'absent',
     courseCode: attendance.course_code || undefined,

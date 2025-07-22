@@ -4,6 +4,7 @@ export interface Student {
   name: string;
   studentId: string;
   checkInTime?: string;
+  checkOutTime?: string;
   method: 'BLE' | 'QR' | 'Absent';
   status: 'verified' | 'pending' | 'absent';
   courseCode?: string;

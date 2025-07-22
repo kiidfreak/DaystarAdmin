@@ -118,6 +118,8 @@ export interface Database {
           course_code: string | null;
           date: string | null;
           location_accuracy: number | null;
+          check_out_time: string | null;
+          course_id: string | null;
         };
         Insert: {
           id?: string;
@@ -136,6 +138,8 @@ export interface Database {
           course_code?: string | null;
           date?: string | null;
           location_accuracy?: number | null;
+          check_out_time?: string | null;
+          course_id?: string | null;
         };
         Update: {
           id?: string;
@@ -154,6 +158,8 @@ export interface Database {
           course_code?: string | null;
           date?: string | null;
           location_accuracy?: number | null;
+          check_out_time?: string | null;
+          course_id?: string | null;
         };
       };
       course_enrollments: {
