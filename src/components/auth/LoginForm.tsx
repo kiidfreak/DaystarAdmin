@@ -31,6 +31,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
         description: `Welcome to UniConnect ${role} dashboard`,
       });
     } catch (error) {
+      console.log(error);
       toast({
         title: "Login Failed",
         description: "Please check your credentials",

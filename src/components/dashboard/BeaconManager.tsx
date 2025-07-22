@@ -31,6 +31,7 @@ import {
   useUnassignBeacon 
 } from '@/hooks/use-api';
 import type { Database } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 type Beacon = Database['public']['Tables']['ble_beacons']['Row'];
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -122,7 +123,12 @@ export const BeaconManager: React.FC = () => {
         is_active: true
       });
     } else {
-      createBeacon.mutate(formData);
+      // Auto-generate UUID if not present
+      const beaconData = {
+        ...formData,
+        uuid: formData.uuid || uuidv4(),
+      };
+      createBeacon.mutate(beaconData);
       setShowCreateForm(false);
       setFormData({
         name: '',
@@ -256,16 +262,17 @@ export const BeaconManager: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">UUID (Optional)</label>
-                <Input
-                  type="text"
-                  value={formData.uuid}
-                  onChange={(e) => setFormData({ ...formData, uuid: e.target.value })}
-                  placeholder="12345678-1234-1234-1234-123456789abc"
-                  className="bg-white/5 border-white/10 text-white"
-                />
-              </div>
+              {formData.uuid && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">UUID</label>
+                  <Input
+                    type="text"
+                    value={formData.uuid}
+                    readOnly
+                    className="bg-white/10 border-white/10 text-white cursor-not-allowed"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Major</label>

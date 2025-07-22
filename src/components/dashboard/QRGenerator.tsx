@@ -4,13 +4,14 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
-import { Monitor, Clock, RotateCcw, Database as DatabaseIcon, QrCode, History } from 'lucide-react';
+import { Monitor, Clock, RotateCcw, Database as DatabaseIcon, QrCode, History, QrCode as QrCodeIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { qrCodeApi } from '@/lib/api';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
+import { QRCodeCanvas } from 'qrcode.react';
 
 type Course = Database['public']['Tables']['courses']['Row'];
 type QRCodePrompt = Database['public']['Tables']['check_in_prompts']['Row'] & {
@@ -206,8 +207,9 @@ export const QRGenerator: React.FC = () => {
             <div className="bg-white p-8 rounded-3xl mb-4">
               <div className="w-48 h-48 mx-auto bg-black rounded-2xl flex items-center justify-center">
                 <div className="text-white text-center">
-                  <QrCode className="w-16 h-16 mx-auto mb-2" />
-                  <p className="text-xs break-all">{activeQRCode.id}</p>
+                  {/* Render the real QR code here */}
+                  <QRCodeCanvas value={activeQRCode.id} size={160} bgColor="#000000" fgColor="#ffffff" includeMargin={false} />
+                  <p className="text-xs break-all mt-2">{activeQRCode.id}</p>
                   <p className="text-xs mt-2">{activeQRCode.course_name}</p>
                 </div>
               </div>
