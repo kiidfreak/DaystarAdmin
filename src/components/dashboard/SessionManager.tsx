@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 import { PageLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
+import { sessionApi } from '@/lib/api';
+import { useBeaconAssignments } from '@/hooks/use-api';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 
 type ClassSession = Database['public']['Tables']['class_sessions']['Row'];
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -36,9 +41,15 @@ interface SessionFormData {
   location?: string;
   attendance_window_start?: string;
   attendance_window_end?: string;
+  beacon_id?: string; // Added beacon_id to the interface
 }
 
 export const SessionManager: React.FC = () => {
+  const { user } = useUser();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // State for form and UI
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
   const [formData, setFormData] = useState<SessionFormData>({
@@ -50,10 +61,16 @@ export const SessionManager: React.FC = () => {
     attendance_window_start: '08:45',
     attendance_window_end: '09:15'
   });
+  const [highlightedSessionId, setHighlightedSessionId] = useState<string | null>(null);
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [sessionDateFilter, setSessionDateFilter] = useState('');
+  const [selectedBeaconId, setSelectedBeaconId] = useState<string>('');
+  
+  // State to track newly created sessions for immediate UI update
+  const [newlyCreatedSessions, setNewlyCreatedSessions] = useState<ClassSession[]>([]);
+  const sessionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { user } = useUser();
+  const { data: beaconAssignments, isLoading: beaconAssignmentsLoading } = useBeaconAssignments();
 
   // Get lecturer's courses - using actual logged-in user ID
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -79,6 +96,7 @@ export const SessionManager: React.FC = () => {
     queryKey: ['lecturer-sessions', user?.id],
     queryFn: async () => {
       const courseIds = courses?.map(course => course.id) || [];
+      console.log('Current lecturer courses:', courses);
       console.log('Fetching sessions for course IDs:', courseIds);
       if (courseIds.length === 0) return [];
 
@@ -103,31 +121,119 @@ export const SessionManager: React.FC = () => {
     enabled: !!courses && courses.length > 0,
   });
 
+  // Temporary debug: Get ALL sessions to see if the created session exists
+  const { data: debugAllSessions } = useQuery({
+    queryKey: ['all-sessions-debug'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('class_sessions')
+        .select(`
+          *,
+          courses (
+            id,
+            name,
+            code
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      console.log('DEBUG: All recent sessions:', data);
+      return data || [];
+    },
+  });
+
   // Create session mutation
   const createSession = useMutation({
     mutationFn: async (sessionData: SessionFormData) => {
-      // Format the session data properly for the database
+      // Find beacon assignment for the selected course
+      let beacon_id: string | undefined = undefined;
+      
+      // Use beacon_id from form if provided, otherwise auto-assign from course
+      if (sessionData.beacon_id) {
+        beacon_id = sessionData.beacon_id;
+      } else if (beaconAssignments && sessionData.course_id) {
+        const assignment = beaconAssignments.find(
+          (a) => a.course_id === sessionData.course_id && !a.session_id // course-level assignment
+        );
+        if (assignment) {
+          beacon_id = assignment.beacon_id;
+        }
+      }
+      
+      // Format the session data properly for the API
+      const sessionDate = sessionData.session_date.split('T')[0];
+      
+      // Ensure start_time and end_time are in HH:MM:SS format
+      const startTime = sessionData.start_time.length === 5 ? sessionData.start_time + ':00' : sessionData.start_time;
+      const endTime = sessionData.end_time.length === 5 ? sessionData.end_time + ':00' : sessionData.end_time;
+      
+      // Format attendance window times as full timestamps
+      const attendanceWindowStart = sessionData.attendance_window_start
+        ? `${sessionDate} ${sessionData.attendance_window_start.length === 5 ? sessionData.attendance_window_start + ':00' : sessionData.attendance_window_start}`
+        : null;
+      const attendanceWindowEnd = sessionData.attendance_window_end
+        ? `${sessionDate} ${sessionData.attendance_window_end.length === 5 ? sessionData.attendance_window_end + ':00' : sessionData.attendance_window_end}`
+        : null;
+      
       const formattedData = {
         course_id: sessionData.course_id,
-        session_date: `${sessionData.session_date}T00:00:00+00`, // Convert to timestamp with timezone
-        start_time: sessionData.start_time, // Keep as time string for time field
-        end_time: sessionData.end_time, // Keep as time string for time field
+        session_date: sessionDate,
+        start_time: startTime, // Always HH:MM:SS format
+        end_time: endTime, // Always HH:MM:SS format
         location: sessionData.location || null,
-        attendance_window_start: sessionData.attendance_window_start ? `${sessionData.session_date} ${sessionData.attendance_window_start}:00` : null, // Convert to timestamp
-        attendance_window_end: sessionData.attendance_window_end ? `${sessionData.session_date} ${sessionData.attendance_window_end}:00` : null, // Convert to timestamp
+        attendance_window_start: attendanceWindowStart,
+        attendance_window_end: attendanceWindowEnd,
+        ...(beacon_id ? { beacon_id } : {})
       };
-
-      const { data, error } = await supabase
-        .from('class_sessions')
-        .insert([formattedData])
-        .select()
-        .single();
       
-      if (error) throw error;
-      return data;
+      console.log('Creating session with formatted data:', formattedData);
+      return await sessionApi.createSession(formattedData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Debug: Log the actual data returned from the API
+      console.log('API returned session data:', data);
+      console.log('Session data type:', typeof data);
+      console.log('Session data keys:', Object.keys(data || {}));
+      
+      // Add the newly created session to state for immediate UI update
+      setNewlyCreatedSessions(prev => [...prev, data]);
+      
+      // Force immediate refetch of sessions
       queryClient.invalidateQueries({ queryKey: ['lecturer-sessions'] });
+      
+      // Debug: Check current cache before update
+      const currentCache = queryClient.getQueryData(['lecturer-sessions', user?.id]);
+      console.log('Current cache before update:', currentCache);
+      console.log('Current cache type:', typeof currentCache);
+      console.log('Current cache length:', Array.isArray(currentCache) ? currentCache.length : 'not array');
+      
+      // Manually update the cache with the new session
+      queryClient.setQueryData(['lecturer-sessions', user?.id], (oldData: any) => {
+        console.log('Updating cache with oldData:', oldData);
+        console.log('Adding new session:', data);
+        
+        if (oldData && Array.isArray(oldData)) {
+          const newData = [...oldData, data];
+          console.log('New cache data length:', newData.length);
+          return newData;
+        }
+        console.log('Cache update failed - oldData not array or null');
+        return oldData;
+      });
+      
+      // Debug: Check cache after update
+      const updatedCache = queryClient.getQueryData(['lecturer-sessions', user?.id]);
+      console.log('Updated cache after manual update:', updatedCache);
+      console.log('Updated cache length:', Array.isArray(updatedCache) ? updatedCache.length : 'not array');
+      
+      // Add a small delay and refetch again to ensure the session appears
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['lecturer-sessions'] });
+        queryClient.refetchQueries({ queryKey: ['lecturer-sessions'] });
+      }, 100);
+      
       setShowCreateForm(false);
       setFormData({
         course_id: '',
@@ -138,6 +244,21 @@ export const SessionManager: React.FC = () => {
         attendance_window_start: '08:45',
         attendance_window_end: '09:15'
       });
+      setHighlightedSessionId(data?.id || null);
+      
+      // Debug: Log the created session
+      console.log('Session created with ID:', data?.id);
+      console.log('Total sessions after creation:', sessions?.length || 0);
+      
+      // Debug: Find the created session in the list
+      const createdSession = sessions?.find(s => s.id === data?.id);
+      console.log('Created session found in list:', createdSession);
+      
+      // Debug: Check if the session has the correct course_id
+      console.log('Created session course_id:', data?.course_id);
+      console.log('Lecturer course IDs:', courses?.map(c => c.id));
+      console.log('Session course_id matches lecturer courses:', courses?.some(c => c.id === data?.course_id));
+      
       toast({
         title: "Session Created",
         description: "Class session has been created successfully",
@@ -281,50 +402,43 @@ export const SessionManager: React.FC = () => {
   const getSessionStatus = (session: ClassSession) => {
     const now = new Date();
     const sessionDate = new Date(session.session_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    sessionDate.setHours(0, 0, 0, 0);
-    
-    // If session date is in the past, it's completed
-    if (sessionDate < today) return 'completed';
-    
-    // If session date is in the future, it's upcoming
-    if (sessionDate > today) return 'upcoming';
-    
-    // If session date is today, check the time
-    if (sessionDate.getTime() === today.getTime()) {
-      // Get current time in minutes since midnight for easier comparison
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      
-      // Parse session times
-      const [startHour, startMinute] = (session.start_time || '00:00').split(':').map(Number);
-      const [endHour, endMinute] = (session.end_time || '23:59').split(':').map(Number);
-      
-      const startMinutes = startHour * 60 + startMinute;
-      const endMinutes = endHour * 60 + endMinute;
-      
-      console.log(`Session: ${session.id}, Current: ${currentMinutes}min, Start: ${startMinutes}min, End: ${endMinutes}min`);
-      
-      // If current time is before start time, it's upcoming
-      if (currentMinutes < startMinutes) return 'upcoming';
-      
-      // If current time is after end time, it's completed
-      if (currentMinutes > endMinutes) return 'completed';
-      
-      // If current time is between start and end time, it's ongoing
-      return 'ongoing';
-    }
-    
-    return 'upcoming';
+    const startTime = session.start_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.start_time}`) : null;
+    const endTime = session.end_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.end_time}`) : null;
+    if (!startTime || !endTime) return 'unknown';
+    if (now < startTime) return 'upcoming';
+    if (now >= startTime && now <= endTime) return 'ongoing';
+    return 'completed';
   };
 
   // Sort sessions by priority: current happening first, then upcoming, then completed
   const sortSessionsByPriority = (sessions: ClassSession[]) => {
     if (!sessions) return [];
     
+    console.log('Sorting sessions, count:', sessions.length);
+    
     return [...sessions].sort((a, b) => {
       const statusA = getSessionStatus(a);
       const statusB = getSessionStatus(b);
+      
+      // Debug: Log status for specific session
+      if (a.id === 'a8807438-d729-43fc-8664-e6793e822cac' || b.id === 'a8807438-d729-43fc-8664-e6793e822cac') {
+        console.log('Status comparison:', {
+          sessionA: { id: a.id, status: statusA, start_time: a.start_time, end_time: a.end_time },
+          sessionB: { id: b.id, status: statusB, start_time: b.start_time, end_time: b.end_time }
+        });
+      }
+      
+      // Debug: Log status for any session from today
+      const today = dayjs().startOf('day');
+      const sessionADate = dayjs.utc(a.session_date).local();
+      const sessionBDate = dayjs.utc(b.session_date).local();
+      
+      if (sessionADate.isSame(today, 'day') || sessionBDate.isSame(today, 'day')) {
+        console.log('TODAY SESSION STATUS COMPARISON:', {
+          sessionA: { id: a.id, date: sessionADate.format('YYYY-MM-DD'), status: statusA, start_time: a.start_time, end_time: a.end_time },
+          sessionB: { id: b.id, date: sessionBDate.format('YYYY-MM-DD'), status: statusB, start_time: b.start_time, end_time: b.end_time }
+        });
+      }
       
       // Priority order: ongoing > upcoming > completed
       const priorityOrder = { ongoing: 0, upcoming: 1, completed: 2 };
@@ -359,7 +473,89 @@ export const SessionManager: React.FC = () => {
     return badges[status as keyof typeof badges] || badges.upcoming;
   };
 
-  if (coursesLoading || sessionsLoading) {
+  // Scroll to highlighted session after sessions update
+  useEffect(() => {
+    if (highlightedSessionId && sessionRefs.current[highlightedSessionId]) {
+      sessionRefs.current[highlightedSessionId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => setHighlightedSessionId(null), 2000);
+    }
+  }, [sessions, highlightedSessionId]);
+
+  // Filter and search logic
+  const combinedSessions = [...(sessions || []), ...newlyCreatedSessions.filter(newSession => 
+    !sessions?.some(existingSession => existingSession.id === newSession.id)
+  )];
+  
+  // Debug: Log the newly created sessions being added
+  console.log('Newly created sessions being added:', newlyCreatedSessions.map(s => ({ id: s.id, start_time: s.start_time, end_time: s.end_time })));
+  console.log('Combined sessions count:', combinedSessions.length);
+  
+  const filteredSessions = sortSessionsByPriority(combinedSessions.filter(session => {
+    const course = courses?.find(c => c.id === session.course_id);
+    const matchesCourse = !sessionSearch || (course && (
+      course.name.toLowerCase().includes(sessionSearch.toLowerCase()) ||
+      course.code.toLowerCase().includes(sessionSearch.toLowerCase())
+    ));
+    const matchesDate = !sessionDateFilter || session.session_date.startsWith(sessionDateFilter);
+    
+    // Debug: Check if this is the newly created session
+    if (session.id === 'a8807438-d729-43fc-8664-e6793e822cac') {
+      console.log('Found newly created session in filter:', {
+        session,
+        course,
+        sessionSearch,
+        sessionDateFilter,
+        matchesCourse,
+        matchesDate
+      });
+    }
+    
+    return matchesCourse && matchesDate;
+  }));
+
+  // Debug: Log the final filtered sessions
+  console.log('Final filtered sessions count:', filteredSessions.length);
+  console.log('First few filtered sessions:', filteredSessions.slice(0, 3).map(s => ({ id: s.id, start_time: s.start_time, end_time: s.end_time })));
+  
+  // Debug: Check if the newly created session is in the final list
+  const newSessionInList = filteredSessions.find(s => s.id === 'a8807438-d729-43fc-8664-e6793e822cac');
+  console.log('New session in final list:', newSessionInList ? 'YES' : 'NO', newSessionInList);
+
+  // Helper to create an active session now
+  const handleCreateActiveSessionNow = () => {
+    if (!formData.course_id) return;
+    
+    const now = dayjs(); // Use local time for creation
+    const start = now.subtract(30, 'minute'); // Start 30 minutes ago (active)
+    const end = now.add(30, 'minute'); // End 30 minutes from now (active)
+    const today = now.format('YYYY-MM-DD');
+    const startTime = start.format('HH:mm:ss');
+    const endTime = end.format('HH:mm:ss');
+    
+    // Send only time strings, let DB trigger add the date
+    const activeAttendanceStart = start.format('HH:mm:ss');
+    const activeAttendanceEnd = end.format('HH:mm:ss');
+    
+    const activeSessionData: SessionFormData = {
+      course_id: formData.course_id,
+      session_date: today,
+      start_time: startTime,
+      end_time: endTime,
+      location: 'Active Session Room',
+      attendance_window_start: activeAttendanceStart, // Just time string
+      attendance_window_end: activeAttendanceEnd // Just time string
+    };
+    
+    console.log('Creating active session now (local time):', activeSessionData);
+    createSession.mutate(activeSessionData);
+  };
+
+  // Helper to check if a string is a time only
+  const isTimeOnly = (str: string) => /^\d{2}:\d{2}(:\d{2})?$/.test(str);
+
+
+
+  if (coursesLoading || sessionsLoading || beaconAssignmentsLoading) {
     return <PageLoading text="Loading sessions..." />;
   }
 
@@ -372,13 +568,23 @@ export const SessionManager: React.FC = () => {
             <h2 className="text-3xl font-bold text-white mb-2">Session Manager</h2>
             <p className="text-gray-400">Create and manage your class sessions</p>
           </div>
-          <Button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Create Session
-          </Button>
+          <div className="flex items-center">
+            <Button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg mr-2"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Create Session
+            </Button>
+            <Button
+              onClick={handleCreateActiveSessionNow}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl shadow-lg"
+              disabled={!formData.course_id}
+            >
+              <Play className="w-5 h-5 mr-2" />
+              Create Active Session Now
+            </Button>
+          </div>
         </div>
 
         {/* Create/Edit Form */}
@@ -484,6 +690,22 @@ export const SessionManager: React.FC = () => {
                     required
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">Beacon (Optional)</label>
+                  <select
+                    value={formData.beacon_id || ''}
+                    onChange={(e) => setFormData({ ...formData, beacon_id: e.target.value || undefined })}
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                  >
+                    <option value="">Auto-assign from course</option>
+                    {beaconAssignments?.map((assignment) => (
+                      <option key={`${assignment.beacon_id}-${assignment.course_id}`} value={assignment.beacon_id}>
+                        {assignment.ble_beacons?.name || assignment.beacon_id} - {assignment.courses?.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end space-x-4 pt-6">
@@ -512,125 +734,144 @@ export const SessionManager: React.FC = () => {
 
         {/* Sessions List */}
         <div className="space-y-6">
-          {(() => {
-            const sortedSessions = sortSessionsByPriority(sessions || []);
-            return (
-              <>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-bold text-white">Your Sessions</h3>
-                  <div className="text-gray-400">
-                    {sortedSessions.length} session{sortedSessions.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
+          {/* Add search/filter bar above the sessions list */}
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-6">
+            <div className="flex-1 mb-2 md:mb-0">
+              <Input
+                placeholder="Search by course name or code..."
+                value={sessionSearch}
+                onChange={e => setSessionSearch(e.target.value)}
+                className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Input
+                type="date"
+                value={sessionDateFilter}
+                onChange={e => setSessionDateFilter(e.target.value)}
+                className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+              />
+              <Button
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['lecturer-sessions'] });
+                  queryClient.invalidateQueries({ queryKey: ['all-sessions-debug'] });
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl"
+              >
+                🔄 Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredSessions.length === 0 ? (
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-12 text-center border border-white/20">
+              <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-6" />
+              <h4 className="text-xl font-semibold text-white mb-2">No sessions found</h4>
+              <p className="text-gray-400 mb-6">Try adjusting your search or filters.</p>
+              <Button
+                onClick={() => setShowCreateForm(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Create Session
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {filteredSessions.map((session, index) => {
+                const status = getSessionStatus(session);
+                const course = courses?.find(c => c.id === session.course_id);
                 
-                {sessions?.length === 0 ? (
-                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-12 text-center border border-white/20">
-                    <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-                    <h4 className="text-xl font-semibold text-white mb-2">No sessions created yet</h4>
-                    <p className="text-gray-400 mb-6">Create your first class session to get started</p>
-                    <Button
-                      onClick={() => setShowCreateForm(true)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl"
-                    >
-                      <Plus className="w-5 h-5 mr-2" />
-                      Create First Session
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid gap-6">
-                    {sortedSessions.map((session) => {
-                      const status = getSessionStatus(session);
-                      const course = courses?.find(c => c.id === session.course_id);
-                      
-                      return (
-                        <div key={session.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-200 shadow-lg">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-4 mb-4">
-                                <div className="bg-purple-600/20 p-3 rounded-xl">
-                                  <BookOpen className="w-6 h-6 text-purple-400" />
-                                </div>
-                                <div>
-                                  <h4 className="text-xl font-semibold text-white mb-1">
-                                    {course?.name || 'Unknown Course'}
-                                  </h4>
-                                  <p className="text-gray-400 text-sm">{course?.code}</p>
-                                </div>
-                                {getStatusBadge(status)}
-                              </div>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                                  <Calendar className="w-5 h-5 text-purple-400" />
-                                  <div>
-                                    <p className="text-sm text-gray-400">Date</p>
-                                    <p className="text-white font-medium">{new Date(session.session_date).toLocaleDateString()}</p>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                                  <Clock className="w-5 h-5 text-purple-400" />
-                                  <div>
-                                    <p className="text-sm text-gray-400">Time</p>
-                                    <p className="text-white font-medium">
-                                      {session.start_time ? session.start_time.substring(0, 5) : '--'} - {session.end_time ? session.end_time.substring(0, 5) : '--'}
-                                    </p>
-                                  </div>
-                                </div>
-                                
-                                {session.location && (
-                                  <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                                    <MapPin className="w-5 h-5 text-purple-400" />
-                                    <div>
-                                      <p className="text-sm text-gray-400">Location</p>
-                                      <p className="text-white font-medium">{session.location}</p>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                                  <Timer className="w-5 h-5 text-purple-400" />
-                                  <div>
-                                    <p className="text-sm text-gray-400">Attendance Window</p>
-                                    <p className="text-white font-medium">
-                                      {session.attendance_window_start 
-                                        ? new Date(session.attendance_window_start).toTimeString().substring(0, 5) 
-                                        : '--'} - {session.attendance_window_end 
-                                        ? new Date(session.attendance_window_end).toTimeString().substring(0, 5) 
-                                        : '--'}
-                                    </p>
-                                  </div>
-                                </div>
+                return (
+                  <div
+                    key={`${session.id}-${index}`}
+                    ref={el => (sessionRefs.current[session.id] = el)}
+                    className={`bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-200 shadow-lg ${highlightedSessionId === session.id ? 'ring-4 ring-purple-400' : ''}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4 mb-4">
+                          <div className="bg-purple-600/20 p-3 rounded-xl">
+                            <BookOpen className="w-6 h-6 text-purple-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-xl font-semibold text-white mb-1">
+                              {course?.name || 'Unknown Course'}
+                            </h4>
+                            <p className="text-gray-400 text-sm">{course?.code}</p>
+                          </div>
+                          {getStatusBadge(status)}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
+                            <Calendar className="w-5 h-5 text-purple-400" />
+                            <div>
+                              <p className="text-sm text-gray-400">Date</p>
+                              <p className="text-white font-medium">{new Date(session.session_date).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
+                            <Clock className="w-5 h-5 text-purple-400" />
+                            <div>
+                              <p className="text-sm text-gray-400">Time</p>
+                              <p className="text-white font-medium">
+                                {session.start_time ? session.start_time.substring(0, 5) : '--'} - {session.end_time ? session.end_time.substring(0, 5) : '--'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {session.location && (
+                            <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
+                              <MapPin className="w-5 h-5 text-purple-400" />
+                              <div>
+                                <p className="text-sm text-gray-400">Location</p>
+                                <p className="text-white font-medium">{session.location}</p>
                               </div>
                             </div>
-                            
-                            <div className="flex space-x-3 ml-6">
-                              <Button
-                                size="sm"
-                                onClick={() => handleEdit(session)}
-                                className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30 rounded-xl px-4 py-2"
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleDelete(session.id)}
-                                className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 rounded-xl px-4 py-2"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </Button>
+                          )}
+                          
+                          <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
+                            <Timer className="w-5 h-5 text-purple-400" />
+                            <div>
+                              <p className="text-sm text-gray-400">Attendance Window</p>
+                              <p className="text-white font-medium">
+                                {session.attendance_window_start 
+                                  ? new Date(session.attendance_window_start).toTimeString().substring(0, 5) 
+                                  : '--'} - {session.attendance_window_end 
+                                  ? new Date(session.attendance_window_end).toTimeString().substring(0, 5) 
+                                  : '--'}
+                              </p>
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
+                      </div>
+                      
+                      <div className="flex space-x-3 ml-6">
+                        <Button
+                          size="sm"
+                          onClick={() => handleEdit(session)}
+                          className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30 rounded-xl px-4 py-2"
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDelete(session.id)}
+                          className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 rounded-xl px-4 py-2"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </>
-            );
-          })()}
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

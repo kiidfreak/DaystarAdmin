@@ -242,19 +242,15 @@ export const UserManagement: React.FC = () => {
 
   // Assign course mutation
   const assignCourse = useMutation({
-    mutationFn: async (formData: FormData) => {
+    mutationFn: async ({ formData, instructorId }: { formData: FormData, instructorId: string }) => {
       const courseId = formData.get('course_id') as string;
-      const instructorId = selectedUser?.id;
-      
       if (!instructorId) throw new Error('No instructor selected');
-      
       const { data, error } = await supabase
         .from('courses')
         .update({ instructor_id: instructorId })
         .eq('id', courseId)
         .select()
         .single();
-      
       if (error) throw error;
       return data;
     },
@@ -337,12 +333,6 @@ export const UserManagement: React.FC = () => {
   const handleAssignCourse = (user: User) => {
     setSelectedUser(user);
     setShowAssignmentForm(true);
-  };
-
-  const handleAssignmentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    assignCourse.mutate(formData);
   };
 
   const getRoleBadge = (role: string) => {
@@ -587,11 +577,11 @@ export const UserManagement: React.FC = () => {
         )}
 
         {/* Course Assignment Form */}
-        {showAssignmentForm && selectedUser && (
+        {showAssignmentForm && (
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-white">
-                Assign Course: {selectedUser.full_name}
+                Assign Course
               </h3>
               <Button
                 variant="ghost"
@@ -605,7 +595,15 @@ export const UserManagement: React.FC = () => {
               </Button>
             </div>
 
-            <form onSubmit={handleAssignmentSubmit} className="space-y-6">
+            <form onSubmit={e => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              let instructorId = selectedUser?.id;
+              if (!instructorId) {
+                instructorId = formData.get('instructor_id') as string;
+              }
+              assignCourse.mutate({ formData, instructorId });
+            }} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-3">Course</label>
                 <select
@@ -621,7 +619,22 @@ export const UserManagement: React.FC = () => {
                   ))}
                 </select>
               </div>
-
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Lecturer</label>
+                <select
+                  name="instructor_id"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                  required={!selectedUser}
+                  defaultValue={selectedUser?.id || ''}
+                >
+                  <option value="">Select a lecturer</option>
+                  {users?.filter(u => u.role === 'lecturer').map((lecturer) => (
+                    <option key={lecturer.id} value={lecturer.id}>
+                      {lecturer.full_name} ({lecturer.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4 pt-6">
                 <Button
                   type="button"

@@ -47,15 +47,6 @@ type StudentEnrollment = {
   notes: string | null;
 };
 
-type UnassignedStudent = {
-  student_id: string;
-  student_name: string;
-  student_email: string;
-  student_number: string;
-  department: string;
-  created_at: string;
-};
-
 type CourseAssignmentStats = {
   course_name: string;
   course_code: string;
@@ -68,24 +59,33 @@ export const StudentCourseAssignment: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<UnassignedStudent | null>(null);
+  // Change selectedStudent type to match the user type from Supabase
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useUser();
 
-  // Get unassigned students
-  const { data: unassignedStudents, isLoading: unassignedLoading } = useQuery({
-    queryKey: ['unassigned-students'],
+  // Add after useUser():
+  const { data: allStudents, isLoading: studentsLoading } = useQuery({
+    queryKey: ['all-students'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .rpc('get_unassigned_students');
-      
+        .from('users')
+        .select('*')
+        .eq('role', 'student')
+        .order('full_name');
       if (error) throw error;
       return data || [];
     },
   });
+  const [studentSearch, setStudentSearch] = useState('');
+  const filteredStudents = allStudents?.filter(student =>
+    student.full_name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+    student.email.toLowerCase().includes(studentSearch.toLowerCase()) ||
+    (student.student_number || '').toLowerCase().includes(studentSearch.toLowerCase())
+  );
 
   // Get all courses
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -219,7 +219,7 @@ export const StudentCourseAssignment: React.FC = () => {
     }
 
     assignCourses.mutate({
-      studentId: selectedStudent.student_id,
+      studentId: selectedStudent.id,
       courseIds: selectedCourses,
       notes: `Assigned by ${user?.full_name} on ${new Date().toLocaleDateString()}`
     });
@@ -242,7 +242,7 @@ export const StudentCourseAssignment: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (unassignedLoading || coursesLoading || enrollmentsLoading || statsLoading) {
+  if (coursesLoading || enrollmentsLoading || statsLoading) {
     return <PageLoading text="Loading course assignments..." />;
   }
 
@@ -273,7 +273,7 @@ export const StudentCourseAssignment: React.FC = () => {
               </div>
               <div>
                 <p className="text-gray-400 text-sm">Unassigned Students</p>
-                <p className="text-2xl font-bold text-white">{unassignedStudents?.length || 0}</p>
+                <p className="text-2xl font-bold text-white">{enrollments?.filter(e => e.enrollment_status === 'pending').length || 0}</p>
               </div>
             </div>
           </Card>
@@ -479,19 +479,26 @@ export const StudentCourseAssignment: React.FC = () => {
               <div className="space-y-6">
                 {/* Student Selection */}
                 <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">Search Student</label>
+                  <Input
+                    placeholder="Search by name, email, or student number..."
+                    value={studentSearch}
+                    onChange={e => setStudentSearch(e.target.value)}
+                    className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                  />
                   <label className="block text-sm font-medium text-gray-300 mb-3">Select Student</label>
                   <select
-                    value={selectedStudent?.student_id || ''}
-                    onChange={(e) => {
-                      const student = unassignedStudents?.find(s => s.student_id === e.target.value);
+                    value={selectedStudent?.id || ''}
+                    onChange={e => {
+                      const student = allStudents?.find(s => s.id === e.target.value);
                       setSelectedStudent(student || null);
                     }}
                     className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
                   >
                     <option value="">Select a student</option>
-                    {unassignedStudents?.map((student) => (
-                      <option key={student.student_id} value={student.student_id}>
-                        {student.student_name} ({student.student_number}) - {student.department}
+                    {filteredStudents?.map((student) => (
+                      <option key={student.id} value={student.id}>
+                        {student.full_name} ({student.student_number || student.email})
                       </option>
                     ))}
                   </select>

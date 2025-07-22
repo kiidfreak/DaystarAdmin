@@ -209,6 +209,30 @@ export const coursesApi = {
     
     if (studentsError) throw studentsError;
     return students || [];
+  },
+
+  async getStudentEnrollments(studentId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('student_course_enrollments')
+      .select(`
+        *,
+        courses!student_course_enrollments_course_id_fkey (
+          id,
+          name,
+          code,
+          department,
+          users!courses_instructor_id_fkey (
+            id,
+            full_name,
+            email
+          )
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('status', 'active');
+    
+    if (error) throw error;
+    return data || [];
   }
 };
 
@@ -360,15 +384,37 @@ export const sessionApi = {
     location?: string;
     attendance_window_start?: string;
     attendance_window_end?: string;
+    beacon_id?: string; // in case beacon assignment is present
   }) {
-    const { data, error } = await supabase
-      .from('class_sessions')
-      .insert([sessionData])
-      .select()
-      .single();
+    // Log all values being sent to the API
+    console.log('Creating session with:', {
+      courseId: sessionData.course_id,
+      session_date: sessionData.session_date,           // e.g., "2025-07-17"
+      start_time: sessionData.start_time,               // e.g., "19:19"
+      end_time: sessionData.end_time,                   // e.g., "20:20"
+      attendance_window_start: sessionData.attendance_window_start, // e.g., "19:19"
+      attendance_window_end: sessionData.attendance_window_end,     // e.g., "20:00"
+      beacon_id: sessionData.beacon_id                  // UUID of the beacon
+    });
     
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('class_sessions')
+        .insert([sessionData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
+      
+      console.log('Session created successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
   },
 
   async getSessionsByCourse(courseId: string) {
@@ -488,8 +534,8 @@ export const beaconApi = {
       `)
       .eq('beacon_id', beacon.id)
       .eq('session_date', today)
-      .gte('start_time', currentTime)
-      .lte('end_time', currentTime)
+      .lte('start_time', currentTime)
+      .gte('end_time', currentTime)
       .order('start_time');
     
     if (sessionsError) {
@@ -672,8 +718,8 @@ export const mobileBeaconApi = {
         `)
         .eq('beacon_id', beacon.id)
         .eq('session_date', today)
-        .gte('start_time', currentTime)
-        .lte('end_time', currentTime)
+        .lte('start_time', currentTime)  // Session has started (start_time <= current_time)
+        .gte('end_time', currentTime)    // Session hasn't ended yet (end_time >= current_time)
         .order('start_time');
       
       if (error) {
