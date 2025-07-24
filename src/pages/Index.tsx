@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { useUser } from '@/contexts/UserContext';
 import { Sidebar } from '@/components/dashboard/Sidebar';
@@ -18,7 +18,7 @@ import { LecturerLiveAttendance } from '@/components/dashboard/LecturerLiveAtten
 import { StudentsPage } from '@/components/dashboard/StudentsPage';
 import { StudentCourseAssignment } from '@/components/dashboard/StudentCourseAssignment';
 import { StudentDashboard } from '@/components/dashboard/StudentDashboard';
-import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen } from 'lucide-react';
+import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen, AlertCircle, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTodayAttendance, useDashboardStats, useUpdateAttendanceStatus } from '@/hooks/use-api';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
@@ -34,8 +34,7 @@ type AttendanceRecord = Database['public']['Tables']['attendance_records']['Row'
 
 const Index = () => {
   const { user, login, logout } = useUser();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState('');
+  const [userRole, setUserRole] = useState(user?.role || '');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalSearchTerm, setGlobalSearchTerm] = useState('');
   const [attendanceFilter, setAttendanceFilter] = useState<'all' | 'present'>('all');
@@ -46,19 +45,18 @@ const Index = () => {
   const { data: stats, isLoading: statsLoading } = useDashboardStats(userRole, user?.id);
   const updateAttendanceStatus = useUpdateAttendanceStatus();
 
-  // Debug logging
-  console.log('Current user:', user);
-  console.log('User role:', userRole);
-  console.log('User ID:', user?.id);
+  // Keep user role in sync with context
+  useEffect(() => {
+    if (user) {
+      setUserRole(user.role);
+    } else {
+      setUserRole('');
+    }
+  }, [user]);
 
   const handleLogin = async (email: string, password: string, role: string) => {
     const result = await login(email, password, role);
-    
-    if (result.success) {
-      setIsLoggedIn(true);
-      setUserRole(role);
-      console.log('Login successful:', { email, role });
-    } else {
+    if (!result.success) {
       toast({
         title: "Login Failed",
         description: result.error || "Invalid credentials",
@@ -69,7 +67,6 @@ const Index = () => {
 
   const handleLogout = () => {
     logout();
-    setIsLoggedIn(false);
     setUserRole('');
     setActiveTab('dashboard');
     toast({
@@ -114,7 +111,8 @@ const Index = () => {
       'course-assignments': 'Course Assignments',
       audit: 'Audit Trail',
       rules: 'System Rules',
-      lecturers: 'Lecturer Overview'
+      lecturers: 'Lecturer Overview',
+      alerts: 'Notifications'
     };
     return titles[activeTab as keyof typeof titles] || 'Dashboard';
   };
@@ -186,11 +184,16 @@ const Index = () => {
                   </div>
                   <MetricCard 
                     title="Attendance Rate" 
-                    value={`${stats?.attendanceRate || 0}%`}
+                    value={
+                      <span className={`inline-flex items-center gap-2 font-mono text-2xl font-bold ${stats?.attendanceRate >= 90 ? 'text-green-400' : stats?.attendanceRate >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>
+                        {Number(stats?.attendanceRate || 0).toFixed(1)}%
+                        {stats?.attendanceRate >= 90 ? '🔥' : stats?.attendanceRate >= 80 ? '👍' : '⚠️'}
+                      </span>
+                    }
                     change="0%"
                     trend="up" 
                     icon={Clock} 
-                    color="blue"
+                    color={stats?.attendanceRate >= 90 ? 'green' : stats?.attendanceRate >= 80 ? 'yellow' : 'red'}
                   />
                   <div onClick={() => setActiveTab('classes')} className="cursor-pointer">
                     <MetricCard 
@@ -282,6 +285,37 @@ const Index = () => {
       case 'course-assignments':
         return <StudentCourseAssignment />;
       
+      case 'alerts':
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="w-full max-w-xl bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 border-2 border-yellow-400 rounded-3xl shadow-2xl p-8 glass-card flex flex-col" style={{minWidth: '340px'}}>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-2xl font-extrabold text-yellow-400 tracking-wide">Notifications</span>
+              </div>
+              <div className="max-h-96 overflow-y-auto space-y-4">
+                {/* Dummy notifications for now */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-yellow-500/30 to-pink-500/10 border-2 border-yellow-400 flex items-center space-x-4 shadow-lg">
+                  <AlertCircle className="w-8 h-8 text-yellow-400" />
+                  <div>
+                    <div className="font-bold text-white text-lg">Low Attendance Alert</div>
+                    <div className="text-gray-200 text-base">Today's attendance rate is 68%</div>
+                    <div className="text-xs text-gray-400 mt-1">12:09 AM</div>
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-red-500/30 to-pink-500/10 border-2 border-red-400 flex items-center space-x-4 shadow-lg">
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                  <div>
+                    <div className="font-bold text-white text-lg">BLE Beacon Issues</div>
+                    <div className="text-gray-200 text-base">2 BLE attendance records without beacon data</div>
+                    <div className="text-xs text-gray-400 mt-1">12:05 AM</div>
+                  </div>
+                </div>
+                {/* Add more notifications as needed */}
+              </div>
+            </div>
+          </div>
+        );
+      
       default:
         return (
           <div className="glass-card p-12 text-center">
@@ -293,7 +327,7 @@ const Index = () => {
     }
   };
 
-  if (!isLoggedIn) {
+  if (!user) {
     return <LoginForm onLogin={handleLogin} />;
   }
 

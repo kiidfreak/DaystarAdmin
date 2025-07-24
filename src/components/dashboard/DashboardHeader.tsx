@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Search, User, X } from 'lucide-react';
-import { NotificationBell } from './NotificationBell';
+import { Search, User, X, AlertCircle } from 'lucide-react';
 import { ProfilePopup } from './ProfilePopup';
 import { Student } from '@/types/student';
 
@@ -30,6 +29,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,12 +103,6 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                 </Button>
               )
             )}
-            <NotificationBell 
-              students={students}
-              onApprove={onApprove}
-              onReject={onReject}
-              userRole={userRole}
-            />
             <Button 
               variant="ghost" 
               size="sm" 
@@ -122,7 +116,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       </div>
 
       <ProfilePopup 
-        isOpen={showProfile}
+        isOpen={!!showProfile}
         onClose={() => setShowProfile(false)}
         userRole={userRole}
         onLogout={onLogout}

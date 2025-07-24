@@ -62,6 +62,11 @@ export const StudentCourseAssignment: React.FC = () => {
   // Change selectedStudent type to match the user type from Supabase
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [assignmentTab, setAssignmentTab] = useState<'student' | 'lecturer'>('student');
+  const [selectedLecturer, setSelectedLecturer] = useState<any | null>(null);
+  const [selectedLecturerCourse, setSelectedLecturerCourse] = useState('');
+  const [lecturerSearch, setLecturerSearch] = useState('');
+  const [lecturerAssigning, setLecturerAssigning] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -204,6 +209,56 @@ export const StudentCourseAssignment: React.FC = () => {
         title: "Update Failed",
         description: "Failed to update enrollment status",
         variant: "destructive",
+      });
+    },
+  });
+
+  // Fetch all lecturers
+  const { data: allLecturers, isLoading: lecturersLoading } = useQuery({
+    queryKey: ['all-lecturers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'lecturer')
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+  const filteredLecturers = allLecturers?.filter(lecturer =>
+    lecturer.full_name.toLowerCase().includes(lecturerSearch.toLowerCase()) ||
+    lecturer.email.toLowerCase().includes(lecturerSearch.toLowerCase())
+  );
+
+  // Assign course to lecturer
+  const assignLecturer = useMutation({
+    mutationFn: async ({ courseId, lecturerId }: { courseId: string; lecturerId: string }) => {
+      setLecturerAssigning(true);
+      const { error } = await supabase
+        .from('courses')
+        .update({ instructor_id: lecturerId })
+        .eq('id', courseId);
+      setLecturerAssigning(false);
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      queryClient.invalidateQueries({ queryKey: ['course-assignment-stats'] });
+      setShowAssignmentModal(false);
+      setSelectedLecturer(null);
+      setSelectedLecturerCourse('');
+      toast({
+        title: 'Course Assigned',
+        description: 'Lecturer has been successfully assigned to the course',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Assignment Failed',
+        description: 'Failed to assign course to lecturer',
+        variant: 'destructive',
       });
     },
   });
@@ -466,7 +521,10 @@ export const StudentCourseAssignment: React.FC = () => {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
             <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-white">Assign Courses to Student</h3>
+                <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <UserPlus className="w-5 h-5" />
+                  Assign Courses
+                </h3>
                 <Button
                   variant="ghost"
                   onClick={() => setShowAssignmentModal(false)}
@@ -475,82 +533,169 @@ export const StudentCourseAssignment: React.FC = () => {
                   <XCircle className="w-5 h-5" />
                 </Button>
               </div>
-
-              <div className="space-y-6">
-                {/* Student Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Search Student</label>
-                  <Input
-                    placeholder="Search by name, email, or student number..."
-                    value={studentSearch}
-                    onChange={e => setStudentSearch(e.target.value)}
-                    className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                  />
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Select Student</label>
-                  <select
-                    value={selectedStudent?.id || ''}
-                    onChange={e => {
-                      const student = allStudents?.find(s => s.id === e.target.value);
-                      setSelectedStudent(student || null);
-                    }}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                  >
-                    <option value="">Select a student</option>
-                    {filteredStudents?.map((student) => (
-                      <option key={student.id} value={student.id}>
-                        {student.full_name} ({student.student_number || student.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Course Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Select Courses</label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {courses?.map((course) => (
-                      <label key={course.id} className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10">
-                        <input
-                          type="checkbox"
-                          checked={selectedCourses.includes(course.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedCourses([...selectedCourses, course.id]);
-                            } else {
-                              setSelectedCourses(selectedCourses.filter(id => id !== course.id));
-                            }
-                          }}
-                          className="rounded border-white/20 bg-white/10 text-purple-600 focus:ring-purple-400"
-                        />
-                        <div className="flex-1">
-                          <p className="text-white font-medium">{course.name}</p>
-                          <p className="text-gray-400 text-sm">{course.code} - {course.department}</p>
-                          {course.users && (
-                            <p className="text-gray-400 text-sm">Instructor: {course.users.full_name}</p>
-                          )}
-                        </div>
-                      </label>
-                    ))}
+              {/* Tabs for Student/Lecturer Assignment */}
+              <div className="flex mb-8 gap-2">
+                <Button
+                  variant={assignmentTab === 'student' ? 'default' : 'outline'}
+                  className={`rounded-xl flex-1 ${assignmentTab === 'student' ? 'bg-purple-600 text-white' : ''}`}
+                  onClick={() => setAssignmentTab('student')}
+                >
+                  <Users className="w-4 h-4 mr-2" /> Assign Student
+                </Button>
+                <Button
+                  variant={assignmentTab === 'lecturer' ? 'default' : 'outline'}
+                  className={`rounded-xl flex-1 ${assignmentTab === 'lecturer' ? 'bg-blue-600 text-white' : ''}`}
+                  onClick={() => setAssignmentTab('lecturer')}
+                >
+                  <GraduationCap className="w-4 h-4 mr-2" /> Assign Lecturer
+                </Button>
+              </div>
+              {/* Student Assignment Tab */}
+              {assignmentTab === 'student' && (
+                <div className="space-y-6">
+                  {/* Student Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Search Student</label>
+                    <Input
+                      placeholder="Search by name, email, or student number..."
+                      value={studentSearch}
+                      onChange={e => setStudentSearch(e.target.value)}
+                      className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    />
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Student</label>
+                    <select
+                      value={selectedStudent?.id || ''}
+                      onChange={e => {
+                        const student = allStudents?.find(s => s.id === e.target.value);
+                        setSelectedStudent(student || null);
+                      }}
+                      className="custom-select"
+                    >
+                      <option value="">Select a student</option>
+                      {filteredStudents?.map((student) => (
+                        <option key={student.id} value={student.id}>
+                          {student.full_name} ({student.student_number || student.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Course Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Courses</label>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {courses?.map((course) => (
+                        <label key={course.id} className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10">
+                          <input
+                            type="checkbox"
+                            checked={selectedCourses.includes(course.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCourses([...selectedCourses, course.id]);
+                              } else {
+                                setSelectedCourses(selectedCourses.filter(id => id !== course.id));
+                              }
+                            }}
+                            className="rounded border-white/20 bg-white/10 text-purple-600 focus:ring-purple-400"
+                          />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{course.name}</p>
+                            <p className="text-gray-400 text-sm">{course.code} - {course.department}</p>
+                            {course.users && (
+                              <p className="text-gray-400 text-sm">Instructor: {course.users.full_name}</p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-4 pt-6">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowAssignmentModal(false)}
+                      className="text-gray-400 hover:text-white px-6 py-3 rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleAssignCourses}
+                      disabled={assignCourses.isPending || !selectedStudent || selectedCourses.length === 0}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
+                    >
+                      {assignCourses.isPending ? 'Assigning...' : 'Assign Courses'}
+                    </Button>
                   </div>
                 </div>
-
-                <div className="flex justify-end space-x-4 pt-6">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowAssignmentModal(false)}
-                    className="text-gray-400 hover:text-white px-6 py-3 rounded-xl"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleAssignCourses}
-                    disabled={assignCourses.isPending || !selectedStudent || selectedCourses.length === 0}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
-                  >
-                    {assignCourses.isPending ? 'Assigning...' : 'Assign Courses'}
-                  </Button>
+              )}
+              {/* Lecturer Assignment Tab */}
+              {assignmentTab === 'lecturer' && (
+                <div className="space-y-6">
+                  {/* Lecturer Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Search Lecturer</label>
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={lecturerSearch}
+                      onChange={e => setLecturerSearch(e.target.value)}
+                      className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                    />
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Lecturer</label>
+                    <select
+                      value={selectedLecturer?.id || ''}
+                      onChange={e => {
+                        const lecturer = allLecturers?.find(l => l.id === e.target.value);
+                        setSelectedLecturer(lecturer || null);
+                      }}
+                      className="custom-select"
+                    >
+                      <option value="">Select a lecturer</option>
+                      {filteredLecturers?.map((lecturer) => (
+                        <option key={lecturer.id} value={lecturer.id}>
+                          {lecturer.full_name} ({lecturer.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Course Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Course</label>
+                    <select
+                      value={selectedLecturerCourse}
+                      onChange={e => setSelectedLecturerCourse(e.target.value)}
+                      className="custom-select"
+                    >
+                      <option value="">Select a course</option>
+                      {courses?.map((course) => (
+                        <option key={course.id} value={course.id}>
+                          {course.name} ({course.code}) {course.users ? `- Instructor: ${course.users.full_name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end space-x-4 pt-6">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowAssignmentModal(false)}
+                      className="text-gray-400 hover:text-white px-6 py-3 rounded-xl"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (selectedLecturer && selectedLecturerCourse) {
+                          assignLecturer.mutate({
+                            courseId: selectedLecturerCourse,
+                            lecturerId: selectedLecturer.id
+                          });
+                        }
+                      }}
+                      disabled={lecturerAssigning || !selectedLecturer || !selectedLecturerCourse}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg"
+                    >
+                      {lecturerAssigning ? 'Assigning...' : 'Assign Course'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

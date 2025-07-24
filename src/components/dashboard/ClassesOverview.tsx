@@ -3,11 +3,26 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Clock, Users, TrendingUp, Eye, EyeOff, Filter } from 'lucide-react';
 import { useCourses, useSessionsByCourse } from '@/hooks/use-api';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
 import { EnhancedAttendanceReport } from './EnhancedAttendanceReport';
 import type { Database } from '@/lib/supabase';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+  DialogDescription
+} from '@/components/ui/dialog';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import Papa from 'papaparse';
+import { saveAs } from 'file-saver';
 
 type Course = Database['public']['Tables']['courses']['Row'] & {
   users?: {
@@ -27,21 +42,22 @@ interface AttendanceReport {
 }
 
 // Fetch real attendance data for a course
-const useAttendanceReports = (courseId: string) => {
+const useAttendanceReports = (courseId: string, courseCode: string) => {
   const { data: attendanceRecords, isLoading, error } = useQuery({
-    queryKey: ['attendance', 'course', courseId],
+    queryKey: ['attendance', 'course', courseId, courseCode],
     queryFn: async () => {
+      if (!courseCode) return [];
       const { data, error } = await supabase
         .from('attendance_records')
         .select('*')
-        .eq('course_code', courseId)
+        .eq('course_code', courseCode)
         .gte('date', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('date', { ascending: false });
-      
       if (error) throw error;
       return data || [];
     },
-    enabled: !!courseId,
+    enabled: !!courseCode,
+    refetchInterval: 5000, // Real-time updates
   });
 
   // Group attendance by date and calculate statistics
@@ -52,16 +68,14 @@ const useAttendanceReports = (courseId: string) => {
       if (!acc[date]) {
         acc[date] = { present: 0, absent: 0, late: 0, total: 0 };
       }
-      
       acc[date].total++;
-      if (record.status === 'verified') {
+      if (record.status === 'present' || record.status === 'verified') {
         acc[date].present++;
-      } else if (record.status === 'pending') {
+      } else if (record.status === 'pending' || record.status === 'late') {
         acc[date].late++;
       } else {
         acc[date].absent++;
       }
-      
       return acc;
     }, {} as Record<string, { present: number; absent: number; late: number; total: number }>);
 
@@ -91,6 +105,12 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all-courses' | 'course-reports'>('all-courses');
   const [dateRange, setDateRange] = useState<'week' | 'month'>('week');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseCode, setNewCourseCode] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   
   // Fetch courses based on user role
   const { data: courses, isLoading, error } = useQuery({
@@ -135,16 +155,70 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
         return data || [];
       }
     },
-    enabled: !!userRole && !!userId,
+    enabled: !!userRole && (userRole !== 'lecturer' || !!userId),
     staleTime: 0, // Always fetch fresh data
   });
-  const { reports: attendanceReports, isLoading: attendanceLoading, error: attendanceError } = useAttendanceReports(selectedCourse || '');
+  const selectedCourseObj = courses?.find(c => c.id === selectedCourse) || null;
 
+  // Move filteredCourses here, before any useEffect or code that uses it
   const filteredCourses = courses?.filter(course => 
     course.name.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
     course.code.toLowerCase().includes(globalSearchTerm.toLowerCase()) ||
     (course as any).users?.full_name.toLowerCase().includes(globalSearchTerm.toLowerCase())
   ) || [];
+
+  const [allCourseReports, setAllCourseReports] = useState<Record<string, AttendanceReport[]>>({});
+
+  useEffect(() => {
+    const fetchAllReports = async () => {
+      if (!filteredCourses.length) return;
+      const reportsObj: Record<string, AttendanceReport[]> = {};
+      for (const course of filteredCourses) {
+        const { data: attendanceRecords, error } = await supabase
+          .from('attendance_records')
+          .select('*')
+          .eq('course_code', course.code)
+          .gte('date', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          .order('date', { ascending: false });
+        if (!error && attendanceRecords) {
+          // Group attendance by date and calculate statistics
+          const groupedByDate = attendanceRecords.reduce((acc, record) => {
+            const date = record.date || new Date(record.created_at).toISOString().split('T')[0];
+            if (!acc[date]) {
+              acc[date] = { present: 0, absent: 0, late: 0, total: 0 };
+            }
+            acc[date].total++;
+            if (record.status === 'present' || record.status === 'verified') {
+              acc[date].present++;
+            } else if (record.status === 'pending' || record.status === 'late') {
+              acc[date].late++;
+            } else {
+              acc[date].absent++;
+            }
+            return acc;
+          }, {} as Record<string, { present: number; absent: number; late: number; total: number }>);
+          // Convert to AttendanceReport format
+          const reports: AttendanceReport[] = Object.entries(groupedByDate).map(([date, stats]) => {
+            const s = stats as { present: number; absent: number; late: number; total: number };
+            return {
+              date: new Date(date).toLocaleDateString(),
+              present: s.present,
+              absent: s.absent,
+              late: s.late,
+              total: s.total,
+              attendanceRate: s.total > 0 ? Math.round((s.present / s.total) * 100) : 0
+            };
+          });
+          reportsObj[course.id] = reports;
+        } else {
+          reportsObj[course.id] = [];
+        }
+      }
+      setAllCourseReports(reportsObj);
+    };
+    fetchAllReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filteredCourses)]);
 
   const getAttendanceRateColor = (rate: number) => {
     if (rate >= 90) return 'text-green-400';
@@ -165,6 +239,87 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
     return colors[day as keyof typeof colors] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   };
 
+  // Export helpers
+  const exportCourseReportCSV = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
+    const csv = Papa.unparse([
+      ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'],
+      ...reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`])
+    ]);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `${courseName}_${courseCode}_AttendanceReport.csv`);
+  };
+  const exportCourseReportPDF = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`${courseName} (${courseCode}) Attendance Report`, 10, 15);
+    doc.setFontSize(10);
+    const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'];
+    const rows = reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`]);
+    doc.autoTable({ head: [headers], body: rows, startY: 25 });
+    doc.save(`${courseName}_${courseCode}_AttendanceReport.pdf`);
+  };
+
+  // Implement exportAllCoursesCSV and exportAllCoursesPDF
+  const exportAllCoursesCSV = () => {
+    if (!filteredCourses.length) return;
+    let allRows = [];
+    for (const course of filteredCourses) {
+      const reports = allCourseReports[course.id] || [];
+      if (reports.length > 0) {
+        allRows = allRows.concat(
+          reports.map(r => ({
+            Course: course.name,
+            Code: course.code,
+            Date: r.date,
+            Present: r.present,
+            Late: r.late,
+            Absent: r.absent,
+            Total: r.total,
+            'Attendance Rate': `${r.attendanceRate}%`
+          }))
+        );
+      }
+    }
+    if (allRows.length === 0) return;
+    const csv = Papa.unparse(allRows);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `AllCourses_AttendanceReports.csv`);
+  };
+
+  const exportAllCoursesPDF = () => {
+    if (!filteredCourses.length) return;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('All Courses Attendance Reports', 10, 15);
+    doc.setFontSize(10);
+    let y = 25;
+    for (const course of filteredCourses) {
+      const reports = allCourseReports[course.id] || [];
+      if (reports.length > 0) {
+        doc.text(`${course.name} (${course.code})`, 10, y);
+        y += 6;
+        const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'];
+        const rows = reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`]);
+        doc.autoTable({ head: [headers], body: rows, startY: y });
+        y = doc.lastAutoTable.finalY + 10;
+      }
+    }
+    doc.save('AllCourses_AttendanceReports.pdf');
+  };
+
+  // Inline date range logic for EnhancedAttendanceReport
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(today);
+  weekEnd.setDate(today.getDate() + (6 - today.getDay()));
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const getDateRange = () =>
+    dateRange === 'week'
+      ? { start: weekStart.toISOString().split('T')[0], end: weekEnd.toISOString().split('T')[0] }
+      : { start: monthStart.toISOString().split('T')[0], end: monthEnd.toISOString().split('T')[0] };
+
   if (isLoading) {
     return <CardLoading text="Loading courses..." />;
   }
@@ -180,6 +335,71 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
 
   return (
     <div className="space-y-8">
+      {/* Create Course Button for Admins */}
+      {userRole === 'admin' && (
+        <div className="flex justify-end mb-4">
+          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setShowCreateModal(true)} variant="default">+ Create Course</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Course</DialogTitle>
+                <DialogDescription>Enter the course name and code below.</DialogDescription>
+              </DialogHeader>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setCreating(true);
+                  setErrorMsg(null);
+                  const { data, error } = await supabase.from('courses').insert({
+                    name: newCourseName,
+                    code: newCourseCode,
+                  });
+                  setCreating(false);
+                  if (error) {
+                    setErrorMsg(error.message);
+                  } else {
+                    setShowCreateModal(false);
+                    setNewCourseName('');
+                    setNewCourseCode('');
+                    queryClient.invalidateQueries({ queryKey: ['courses'] });
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Course Name</label>
+                  <Input
+                    value={newCourseName}
+                    onChange={e => setNewCourseName(e.target.value)}
+                    placeholder="e.g. Introduction to AI"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1">Course Code</label>
+                  <Input
+                    value={newCourseCode}
+                    onChange={e => setNewCourseCode(e.target.value)}
+                    placeholder="e.g. AI101"
+                    required
+                  />
+                </div>
+                {errorMsg && <div className="text-red-400 text-sm">{errorMsg}</div>}
+                <DialogFooter>
+                  <Button type="submit" disabled={creating}>
+                    {creating ? 'Creating...' : 'Create Course'}
+                  </Button>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
       {globalSearchTerm && (
         <div className="glass-card p-4">
           <p className="text-white">
@@ -191,143 +411,21 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
 
       <div className="glass-card p-6">
         <h2 className="text-xl font-bold text-white mb-6">All Courses</h2>
+        {/* Export All Courses Buttons */}
+        <div className="flex gap-2 mb-4">
+          <Button onClick={exportAllCoursesCSV} variant="outline">Export All to CSV</Button>
+          <Button onClick={exportAllCoursesPDF} variant="outline">Export All to PDF</Button>
+        </div>
         
         <div className="grid gap-6">
           {filteredCourses.map((course) => (
-            <div key={course.id} className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-white">{course.name}</h3>
-                    <Badge className="bg-sky-blue/20 text-sky-blue border border-sky-blue/30 rounded-xl">
-                      {course.code}
-                    </Badge>
-                  </div>
-                  <p className="text-gray-400 mb-3">{(course as any).users?.full_name || 'No instructor assigned'}</p>
-                </div>
-                
-                <Button
-                  size="sm"
-                  onClick={() => setSelectedCourse(selectedCourse === course.id ? null : course.id)}
-                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl"
-                >
-                  {selectedCourse === course.id ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
-                  {selectedCourse === course.id ? 'Hide' : 'View'} Reports
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                <div className="flex items-center space-x-2 text-gray-300">
-                  <Clock className="w-4 h-4 text-sky-blue" />
-                  <span className="text-sm">Course Code: {course.code}</span>
-                </div>
-                
-                <div className="flex items-center space-x-2 text-gray-300">
-                  <MapPin className="w-4 h-4 text-sky-blue" />
-                  <span className="text-sm">Created: {new Date(course.created_at).toLocaleDateString()}</span>
-                </div>
-                
-                <div className="flex items-center space-x-2 text-gray-300">
-                  <Users className="w-4 h-4 text-sky-blue" />
-                  <span className="text-sm">Course ID: {course.id.slice(0, 8)}...</span>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-sky-blue" />
-                <div className="flex space-x-2">
-                  <Badge className="text-xs border rounded-lg bg-sky-blue/20 text-sky-blue border-sky-blue/30">
-                    Active Course
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Attendance Reports */}
-              {selectedCourse === course.id && (
-                <div className="mt-6 pt-6 border-t border-white/10">
-                  <h4 className="text-lg font-semibold text-white mb-4">Attendance Reports - Last 14 Days</h4>
-                  
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-white/10">
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Date</th>
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Present</th>
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Late</th>
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Absent</th>
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Total</th>
-                          <th className="text-left py-2 px-3 text-gray-400 font-medium text-sm">Rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {attendanceLoading ? (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-gray-400">
-                              Loading attendance data...
-                            </td>
-                          </tr>
-                        ) : attendanceError ? (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-red-400">
-                              Error loading attendance data
-                            </td>
-                          </tr>
-                        ) : attendanceReports.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-gray-400">
-                              No attendance data available
-                            </td>
-                          </tr>
-                        ) : (
-                          attendanceReports.map((report, index) => (
-                            <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="py-3 px-3 text-white text-sm">{report.date}</td>
-                              <td className="py-3 px-3 text-green-400 font-medium text-sm">{report.present}</td>
-                              <td className="py-3 px-3 text-yellow-400 font-medium text-sm">{report.late}</td>
-                              <td className="py-3 px-3 text-red-400 font-medium text-sm">{report.absent}</td>
-                              <td className="py-3 px-3 text-gray-300 text-sm">{report.total}</td>
-                              <td className={`py-3 px-3 font-medium text-sm ${getAttendanceRateColor(report.attendanceRate)}`}>
-                                {report.attendanceRate}%
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="mt-4 p-4 bg-white/5 rounded-lg">
-                    <h5 className="text-sm font-medium text-white mb-2">Summary Statistics</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                      <div>
-                        <span className="text-gray-400">Avg. Attendance:</span>
-                        <span className="ml-1 font-medium text-green-400">
-                          {attendanceReports.length > 0 
-                            ? Math.round(attendanceReports.reduce((sum, r) => sum + r.attendanceRate, 0) / attendanceReports.length)
-                            : 0}%
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Best Day:</span>
-                        <span className="ml-1 font-medium text-green-400">
-                          {attendanceReports.length > 0 
-                            ? Math.max(...attendanceReports.map(r => r.attendanceRate))
-                            : 0}%
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Total Classes:</span>
-                        <span className="ml-1 font-medium text-white">{attendanceReports.length}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Course Code:</span>
-                        <span className="ml-1 font-medium text-sky-blue">{course.code}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <CourseAttendanceCard
+              key={course.id}
+              course={course}
+              reports={allCourseReports[course.id] || []}
+              isSelected={selectedCourse === course.id}
+              onSelect={() => setSelectedCourse(selectedCourse === course.id ? null : course.id)}
+            />
           ))}
         </div>
         
@@ -365,6 +463,96 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
             endDate={getDateRange().end}
             userRole={userRole}
           />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Add this new component above ClassesOverview
+const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport[]; isSelected: boolean; onSelect: () => void }> = ({ course, reports, isSelected, onSelect }) => {
+  return (
+    <div className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors shadow-lg">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center space-x-3 mb-2">
+            <h3 className="text-lg font-semibold text-white">{course.name}</h3>
+            <Badge className="bg-sky-blue/20 text-sky-blue border border-sky-blue/30 rounded-xl">
+              {course.code}
+            </Badge>
+          </div>
+          <p className="text-gray-400 mb-3">{(course as any).users?.full_name || 'No instructor assigned'}</p>
+        </div>
+        <Button
+          size="sm"
+          onClick={onSelect}
+          className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl"
+        >
+          {isSelected ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
+          {isSelected ? 'Hide' : 'View'} Reports
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-4 mb-4 text-gray-300">
+        <div className="flex items-center space-x-2">
+          <Clock className="w-4 h-4 text-sky-blue" />
+          <span className="text-sm">Course Code: {course.code}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <MapPin className="w-4 h-4 text-sky-blue" />
+          <span className="text-sm">Created: {new Date(course.created_at).toLocaleDateString()}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Users className="w-4 h-4 text-sky-blue" />
+          <span className="text-sm">Course ID: {course.id.slice(0, 8)}...</span>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2 mb-4">
+        <Calendar className="w-4 h-4 text-sky-blue" />
+        <Badge className="text-xs border rounded-lg bg-sky-blue/20 text-sky-blue border-sky-blue/30">
+          Active Course
+        </Badge>
+      </div>
+      {isSelected && (
+        <div className="mt-6">
+          <h4 className="text-md font-semibold text-white mb-2">Attendance Reports (Last 2 Weeks)</h4>
+          <div className="flex gap-2 mb-4">
+            <Button size="sm" variant="outline" onClick={() => exportCourseReportCSV(course.name, course.code, reports)}>
+              Export CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => exportCourseReportPDF(course.name, course.code, reports)}>
+              Export PDF
+            </Button>
+          </div>
+          {reports.length === 0 ? (
+            <div className="text-gray-400">No attendance records found.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs text-left text-gray-300">
+                <thead>
+                  <tr className="bg-white/10">
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Present</th>
+                    <th className="px-3 py-2">Late</th>
+                    <th className="px-3 py-2">Absent</th>
+                    <th className="px-3 py-2">Total</th>
+                    <th className="px-3 py-2">Attendance Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((r, i) => (
+                    <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="px-3 py-2">{r.date}</td>
+                      <td className="px-3 py-2">{r.present}</td>
+                      <td className="px-3 py-2">{r.late}</td>
+                      <td className="px-3 py-2">{r.absent}</td>
+                      <td className="px-3 py-2">{r.total}</td>
+                      <td className="px-3 py-2 font-bold" style={{ color: r.attendanceRate >= 80 ? '#22c55e' : r.attendanceRate >= 50 ? '#eab308' : '#ef4444' }}>{r.attendanceRate}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

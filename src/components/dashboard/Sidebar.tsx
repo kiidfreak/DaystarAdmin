@@ -11,7 +11,8 @@ import {
   Monitor,
   Clock,
   Bluetooth,
-  GraduationCap
+  GraduationCap,
+  Menu
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,10 +23,27 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChange, onLogout }) => {
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  if (collapsed) {
+    return (
+      <div className="sidebar-glass h-screen flex flex-col items-center justify-start p-2 w-20 transition-all duration-300">
+        <Button
+          variant="ghost"
+          className="mb-4 mt-2"
+          onClick={() => setCollapsed(false)}
+        >
+          <Menu className="w-7 h-7 text-sky-blue" />
+        </Button>
+      </div>
+    );
+  }
+
   const getMenuItems = () => {
     const baseItems = [
       { id: 'dashboard', label: 'Dashboard', icon: Grid2X2 },
       { id: 'classes', label: 'All Courses', icon: Calendar },
+      { id: 'alerts', label: 'Alerts', icon: Bell },
     ];
 
     const roleSpecificItems = {
@@ -52,9 +70,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
   };
 
   return (
-    <div className="sidebar-glass w-80 h-screen p-6 flex flex-col">
-      <div className="mb-8">
-        <div className="flex items-center space-x-3 mb-2">
+    <div className="sidebar-glass w-80 h-screen p-6 flex flex-col transition-all duration-300">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-sky-blue/20 rounded-2xl flex items-center justify-center">
             <span className="text-lg font-bold text-sky-blue">UC</span>
           </div>
@@ -63,6 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
             <p className="text-sm text-gray-400 capitalize">{userRole.replace('_', ' ')} Panel</p>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          className="ml-2"
+          onClick={() => setCollapsed(true)}
+        >
+          <Menu className="w-7 h-7 text-sky-blue" />
+        </Button>
       </div>
 
       <nav className="flex-1 space-y-2">

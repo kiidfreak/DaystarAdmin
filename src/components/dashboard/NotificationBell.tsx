@@ -6,6 +6,8 @@ import { Bell, X, Check, Clock, AlertCircle, Users, BookOpen, AlertTriangle } fr
 import { Student } from '@/types/student';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface NotificationBellProps {
   students: Student[];
@@ -240,14 +242,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     <div className="relative">
       <Button 
         variant="ghost" 
-        size="sm" 
-        className="glass-button p-3 relative"
+        size="lg" 
+        className="glass-button p-4 relative hover:scale-110 focus:scale-110 transition-transform duration-200"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <Bell className="w-5 h-5 text-sky-blue" />
+        <Bell className="w-7 h-7 text-sky-blue drop-shadow-lg" />
         {totalAlerts > 0 && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-            <span className="text-xs text-white font-bold">{totalAlerts}</span>
+          <div className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center glow-badge">
+            <span className="text-sm text-white font-bold animate-pulse">{totalAlerts}</span>
           </div>
         )}
       </Button>

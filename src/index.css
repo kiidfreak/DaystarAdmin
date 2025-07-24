@@ -87,4 +87,41 @@
   .sidebar-glass {
     @apply bg-charcoal/80 backdrop-blur-2xl border-r border-white/10;
   }
+
+  select, .custom-select {
+    width: 100%;
+    height: 3.25rem;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border-radius: 1rem;
+    border: 2.5px solid #38bdf8;
+    background: rgba(30,41,59,0.98);
+    color: #fff;
+    font-size: 1.15rem;
+    font-weight: 600;
+    box-shadow: 0 2px 16px 0 rgba(56,189,248,0.10);
+    appearance: none;
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.5em;
+  }
+  select:focus, .custom-select:focus {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px #38bdf8aa;
+  }
+  select:hover, .custom-select:hover {
+    border-color: #0ea5e9;
+  }
+  select option, .custom-select option {
+    background: #1e293b;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 0.75rem 1rem;
+  }
+  .glow-badge {
+    @apply animate-pulse shadow-lg ring-2 ring-red-500 ring-offset-2;
+  }
 }
