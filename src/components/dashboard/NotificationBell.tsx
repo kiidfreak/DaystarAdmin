@@ -6,6 +6,7 @@ import { Bell, X, Check, Clock, AlertCircle, Users, BookOpen, AlertTriangle } fr
 import { Student } from '@/types/student';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeNotifications, Notification } from '@/hooks/use-realtime-notifications';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -16,133 +17,6 @@ interface NotificationBellProps {
   userRole?: string;
 }
 
-// Function to check for attendance errors and issues
-const checkAttendanceErrors = async (attendanceRecords: any[], sessions: any[]) => {
-  const errors = [];
-  const now = new Date();
-
-  // Check for duplicate attendance records
-  const studentAttendanceCounts = attendanceRecords.reduce((acc, record) => {
-    const key = `${record.student_id}-${record.session_id}`;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const duplicates = Object.entries(studentAttendanceCounts)
-    .filter(([_, count]) => (count as number) > 1)
-    .map(([key, count]) => {
-      const [studentId, sessionId] = key.split('-');
-      return { studentId, sessionId, count };
-    });
-
-  if (duplicates.length > 0) {
-    errors.push({
-      id: 'duplicate-attendance',
-      type: 'error',
-      title: 'Duplicate Attendance Records',
-      message: `${duplicates.length} duplicate attendance record${duplicates.length === 1 ? '' : 's'} detected`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  // Check for attendance outside session times
-  const invalidTimeRecords = attendanceRecords.filter(record => {
-    const session = sessions.find(s => s.id === record.session_id);
-    if (!session || !record.check_in_time) return false;
-
-    const sessionDate = new Date(session.session_date);
-    const startTime = session.start_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.start_time}`) : null;
-    const endTime = session.end_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${session.end_time}`) : null;
-    const checkInTime = new Date(record.check_in_time);
-
-    if (!startTime || !endTime) return false;
-
-    // Allow 15 minutes before session starts and 15 minutes after session ends
-    const earlyStart = new Date(startTime.getTime() - 15 * 60 * 1000);
-    const lateEnd = new Date(endTime.getTime() + 15 * 60 * 1000);
-
-    return checkInTime < earlyStart || checkInTime > lateEnd;
-  });
-
-  if (invalidTimeRecords.length > 0) {
-    errors.push({
-      id: 'invalid-time-attendance',
-      type: 'error',
-      title: 'Invalid Attendance Times',
-      message: `${invalidTimeRecords.length} attendance record${invalidTimeRecords.length === 1 ? '' : 's'} outside session times`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  // Check for missing session data
-  const attendanceWithoutSession = attendanceRecords.filter(record => 
-    !sessions.find(s => s.id === record.session_id)
-  );
-
-  if (attendanceWithoutSession.length > 0) {
-    errors.push({
-      id: 'missing-session-data',
-      type: 'error',
-      title: 'Missing Session Data',
-      message: `${attendanceWithoutSession.length} attendance record${attendanceWithoutSession.length === 1 ? '' : 's'} with missing session data`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  // Check for BLE beacon issues (if attendance method is BLE but no beacon data)
-  const bleRecordsWithoutBeacon = attendanceRecords.filter(record => 
-    record.method === 'BLE' && (!record.beacon_id && !record.beacon_mac_address)
-  );
-
-  if (bleRecordsWithoutBeacon.length > 0) {
-    errors.push({
-      id: 'ble-beacon-issues',
-      type: 'error',
-      title: 'BLE Beacon Issues',
-      message: `${bleRecordsWithoutBeacon.length} BLE attendance record${bleRecordsWithoutBeacon.length === 1 ? '' : 's'} without beacon data`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  // Check for QR code issues (if attendance method is QR but no QR data)
-  const qrRecordsWithoutData = attendanceRecords.filter(record => 
-    record.method === 'QR' && (!record.qr_code && !record.qr_session_id)
-  );
-
-  if (qrRecordsWithoutData.length > 0) {
-    errors.push({
-      id: 'qr-code-issues',
-      type: 'error',
-      title: 'QR Code Issues',
-      message: `${qrRecordsWithoutData.length} QR attendance record${qrRecordsWithoutData.length === 1 ? '' : 's'} without QR data`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  // Check for high error rate in attendance
-  const totalRecords = attendanceRecords.length;
-  const errorRecords = duplicates.length + invalidTimeRecords.length + attendanceWithoutSession.length;
-  const errorRate = totalRecords > 0 ? (errorRecords / totalRecords) * 100 : 0;
-
-  if (errorRate > 10) { // Alert if error rate is above 10%
-    errors.push({
-      id: 'high-error-rate',
-      type: 'error',
-      title: 'High Error Rate',
-      message: `Attendance error rate is ${errorRate.toFixed(1)}% (${errorRecords}/${totalRecords} records)`,
-      icon: AlertTriangle,
-      timestamp: new Date()
-    });
-  }
-
-  return errors;
-};
-
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   students,
   onApprove,
@@ -150,13 +24,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   userRole
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { notifications, clearNotification, clearAllNotifications } = useRealtimeNotifications();
   
   const pendingStudents = students.filter(student => student.status === 'pending');
   const pendingCount = pendingStudents.length;
 
-  // Get real-time alerts
-  const { data: alerts, isLoading: alertsLoading } = useQuery({
-    queryKey: ['alerts', 'realtime'],
+  // Get additional system alerts
+  const { data: systemAlerts, isLoading: alertsLoading } = useQuery({
+    queryKey: ['system-alerts'],
     queryFn: async () => {
       const today = new Date().toISOString().split('T')[0];
       
@@ -176,7 +51,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       
       if (attendanceError) throw attendanceError;
 
-      const alerts = [];
+      const alerts: Notification[] = [];
 
       // Check for ongoing sessions
       const now = new Date();
@@ -194,202 +69,217 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           type: 'info',
           title: 'Live Classes',
           message: `${ongoingSessions.length} class${ongoingSessions.length === 1 ? ' is' : 'es are'} currently in session`,
-          icon: BookOpen,
           timestamp: new Date()
         });
       }
 
-      // Check for low attendance
-      const totalAttendance = todayAttendance?.length || 0;
-      const presentAttendance = todayAttendance?.filter(a => a.status === 'verified').length || 0;
-      const attendanceRate = totalAttendance > 0 ? (presentAttendance / totalAttendance) * 100 : 0;
+      // Check for low attendance sessions
+      const sessionsWithLowAttendance = todaySessions?.filter(session => {
+        const sessionAttendance = todayAttendance?.filter(record => record.session_id === session.id) || [];
+        const attendanceRate = sessionAttendance.length > 0 ? 
+          (sessionAttendance.filter(r => r.status === 'verified').length / sessionAttendance.length) * 100 : 0;
+        return attendanceRate < 50; // Alert if attendance rate is below 50%
+      }) || [];
 
-      if (attendanceRate < 70 && totalAttendance > 0) {
+      if (sessionsWithLowAttendance.length > 0) {
         alerts.push({
           id: 'low-attendance',
           type: 'warning',
           title: 'Low Attendance Alert',
-          message: `Today's attendance rate is ${attendanceRate.toFixed(1)}%`,
-          icon: AlertCircle,
+          message: `${sessionsWithLowAttendance.length} session${sessionsWithLowAttendance.length === 1 ? '' : 's'} with low attendance`,
           timestamp: new Date()
         });
       }
 
-      // Check for pending approvals (only for lecturers)
-      if (userRole === 'lecturer' && pendingCount > 0) {
-        alerts.push({
-          id: 'pending-approvals',
-          type: 'pending',
-          title: 'Pending Approvals',
-          message: `${pendingCount} student${pendingCount === 1 ? '' : 's'} waiting for approval`,
-          icon: Users,
-          timestamp: new Date()
-        });
-      }
+      // Check for beacon issues
+      const { data: beacons, error: beaconError } = await supabase
+        .from('beacons')
+        .select('*')
+        .eq('is_active', true);
 
-      // Check for attendance errors and issues
-      const errorAlerts = await checkAttendanceErrors(todayAttendance, todaySessions);
-      alerts.push(...errorAlerts);
+      if (!beaconError && beacons) {
+        const inactiveBeacons = beacons.filter(beacon => !beacon.is_active);
+        if (inactiveBeacons.length > 0) {
+          alerts.push({
+            id: 'inactive-beacons',
+            type: 'error',
+            title: 'Inactive Beacons',
+            message: `${inactiveBeacons.length} beacon${inactiveBeacons.length === 1 ? ' is' : 's are'} currently inactive`,
+            timestamp: new Date()
+          });
+        }
+      }
 
       return alerts;
     },
-    refetchInterval: 10000, // Refresh every 10 seconds for real-time alerts
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  const totalAlerts = (alerts?.length || 0) + pendingCount;
+  // Combine real-time notifications with system alerts
+  const allNotifications = [
+    ...notifications,
+    ...(systemAlerts || [])
+  ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  const totalAlerts = allNotifications.length + pendingCount;
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return <Check className="w-4 h-4 text-green-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'info':
+        return <BookOpen className="w-4 h-4 text-[#001F3F]" />;
+      default:
+        return <Bell className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'warning':
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'error':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'info':
+        return 'bg-[#001F3F]/20 text-[#001F3F] border-[#001F3F]/30';
+      default:
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
 
   return (
     <div className="relative">
-      <Button 
-        variant="ghost" 
-        size="lg" 
-        className="glass-button p-4 relative hover:scale-110 focus:scale-110 transition-transform duration-200"
+      <Button
+        variant="ghost"
+        size="sm"
+        className="relative p-2"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <Bell className="w-7 h-7 text-sky-blue drop-shadow-lg" />
+        <Bell className="w-7 h-7 text-[#001F3F] drop-shadow-lg" />
         {totalAlerts > 0 && (
           <div className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center glow-badge">
-            <span className="text-sm text-white font-bold animate-pulse">{totalAlerts}</span>
+            <span className="text-xs font-bold text-white">{totalAlerts}</span>
           </div>
         )}
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[99999]" onClick={() => setIsOpen(false)}>
-          <div 
-            className="absolute right-8 top-20 w-80 bg-gray-900/98 backdrop-blur-sm border border-white/20 rounded-xl shadow-2xl z-[99999]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-white/10">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white">Alerts</h3>
+        <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#001F3F]">Notifications</h3>
+              <div className="flex space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAllNotifications}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Clear All
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsOpen(false)}
-                  className="h-6 w-6 p-0 text-gray-400 hover:text-white"
+                  className="text-xs text-gray-500 hover:text-gray-700"
                 >
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              {totalAlerts > 0 && (
-                <p className="text-sm text-gray-400 mt-1">
-                  {totalAlerts} alert{totalAlerts === 1 ? '' : 's'} requiring attention
-                </p>
-              )}
             </div>
+          </div>
 
-            <div className="max-h-96 overflow-y-auto">
-              {totalAlerts === 0 ? (
-                <div className="p-6 text-center text-gray-400">
-                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>No alerts</p>
-                </div>
-              ) : (
-                <div className="p-2">
-                  {/* System Alerts */}
-                  {alerts?.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className="p-3 rounded-lg hover:bg-white/5 transition-colors border-b border-white/5"
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          alert.type === 'warning' ? 'bg-yellow-500/20' :
-                          alert.type === 'info' ? 'bg-blue-500/20' :
-                          alert.type === 'error' ? 'bg-red-500/20' :
-                          'bg-orange-500/20'
-                        }`}>
-                          <alert.icon className={`w-4 h-4 ${
-                            alert.type === 'warning' ? 'text-yellow-400' :
-                            alert.type === 'info' ? 'text-blue-400' :
-                            alert.type === 'error' ? 'text-red-400' :
-                            'text-orange-400'
-                          }`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <p className="font-medium text-white text-sm">
-                              {alert.title}
-                            </p>
-                            <Badge className={`border rounded text-xs ${
-                              alert.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                              alert.type === 'info' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                              alert.type === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                              'bg-orange-500/20 text-orange-400 border-orange-500/30'
-                            }`}>
-                              {alert.type}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-400 mb-1">{alert.message}</p>
-                          <div className="flex items-center space-x-1 text-xs text-gray-400">
-                            <Clock className="w-3 h-3" />
-                            <span>{alert.timestamp.toLocaleTimeString('en-US', { 
-                              hour: '2-digit', 
-                              minute: '2-digit',
-                              hour12: true 
-                            })}</span>
-                          </div>
-                        </div>
-                      </div>
+          <div className="p-4 space-y-3">
+            {allNotifications.length === 0 && pendingCount === 0 ? (
+              <div className="text-center py-8">
+                <Bell className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500">No notifications</p>
+              </div>
+            ) : (
+              <>
+                {/* Real-time Notifications */}
+                {allNotifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mt-1">
+                      {getNotificationIcon(notification.type)}
                     </div>
-                  ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-900">
+                          {notification.title}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => clearNotification(notification.id)}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-2">
+                        {notification.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
 
-                  {/* Pending Approvals (only for lecturers) */}
-                  {userRole === 'lecturer' && pendingStudents.map((student) => (
-                    <div
-                      key={student.id}
-                      className="p-3 rounded-lg hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <p className="font-medium text-white text-sm truncate">
-                              {student.name}
-                            </p>
-                            <Badge className="status-warning border rounded text-xs">
-                              {student.method}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-400 mb-1">ID: {student.studentId}</p>
-                          <div className="flex items-center space-x-1 text-xs text-gray-400">
-                            <Clock className="w-3 h-3" />
-                            <span>{student.checkInTime || 'Just now'}</span>
-                          </div>
+                {/* Pending Student Approvals */}
+                {pendingCount > 0 && (
+                  <div className="border-t border-gray-200 pt-3">
+                    <h4 className="text-sm font-medium text-[#001F3F] mb-2">
+                      Pending Approvals ({pendingCount})
+                    </h4>
+                    {pendingStudents.slice(0, 3).map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg mb-2"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-yellow-600" />
+                          <span className="text-sm text-gray-700">{student.name}</span>
                         </div>
-                        
-                        <div className="flex space-x-1 ml-2">
+                        <div className="flex space-x-1">
                           <Button
                             size="sm"
-                            onClick={() => {
-                              onApprove?.(student.id);
-                              if (pendingStudents.length === 1) {
-                                setIsOpen(false);
-                              }
-                            }}
-                            className="h-7 w-7 p-0 bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 rounded"
+                            variant="ghost"
+                            onClick={() => onApprove?.(student.id)}
+                            className="text-xs text-green-600 hover:text-green-700"
                           >
                             <Check className="w-3 h-3" />
                           </Button>
                           <Button
                             size="sm"
-                            onClick={() => {
-                              onReject?.(student.id);
-                              if (pendingStudents.length === 1) {
-                                setIsOpen(false);
-                              }
-                            }}
-                            className="h-7 w-7 p-0 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded"
+                            variant="ghost"
+                            onClick={() => onReject?.(student.id)}
+                            className="text-xs text-red-600 hover:text-red-700"
                           >
                             <X className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                    {pendingCount > 3 && (
+                      <p className="text-xs text-gray-500 text-center">
+                        +{pendingCount - 3} more pending approvals
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

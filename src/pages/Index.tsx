@@ -18,7 +18,12 @@ import { LecturerLiveAttendance } from '@/components/dashboard/LecturerLiveAtten
 import { StudentsPage } from '@/components/dashboard/StudentsPage';
 import { StudentCourseAssignment } from '@/components/dashboard/StudentCourseAssignment';
 import { StudentDashboard } from '@/components/dashboard/StudentDashboard';
-import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen, AlertCircle, X } from 'lucide-react';
+import { AttendanceAnalytics } from '@/components/dashboard/AttendanceAnalytics';
+import { DeviceVerification } from '@/components/dashboard/DeviceVerification';
+import { LecturerPresence } from '@/components/dashboard/LecturerPresence';
+
+import { useRealtimeAttendance } from '@/hooks/use-realtime-attendance';
+import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen, AlertCircle, X, Smartphone, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTodayAttendance, useDashboardStats, useUpdateAttendanceStatus } from '@/hooks/use-api';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
@@ -44,6 +49,9 @@ const Index = () => {
   const { data: attendanceData, isLoading: attendanceLoading } = useTodayAttendance();
   const { data: stats, isLoading: statsLoading } = useDashboardStats(userRole, user?.id);
   const updateAttendanceStatus = useUpdateAttendanceStatus();
+
+  // Real-time attendance updates
+  const { isConnected } = useRealtimeAttendance();
 
   // Keep user role in sync with context
   useEffect(() => {
@@ -112,7 +120,10 @@ const Index = () => {
       audit: 'Audit Trail',
       rules: 'System Rules',
       lecturers: 'Lecturer Overview',
-      alerts: 'Notifications'
+      alerts: 'Notifications',
+      'attendance-analytics': 'Attendance Analytics',
+      'device-verification': 'Device Verification',
+      'lecturer-presence': 'Lecturer Presence'
     };
     return titles[activeTab as keyof typeof titles] || 'Dashboard';
   };
@@ -285,6 +296,15 @@ const Index = () => {
       case 'course-assignments':
         return <StudentCourseAssignment />;
       
+      case 'attendance-analytics':
+        return <AttendanceAnalytics userRole={userRole} />;
+      
+      case 'device-verification':
+        return <DeviceVerification />;
+      
+      case 'lecturer-presence':
+        return <LecturerPresence userRole={userRole} userId={user?.id} />;
+      
       case 'alerts':
         return (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -350,6 +370,7 @@ const Index = () => {
           onSearch={handleGlobalSearch}
           activeTab={activeTab}
           onLogout={handleLogout}
+          isConnected={isConnected}
         />
         {renderDashboardContent()}
       </div>

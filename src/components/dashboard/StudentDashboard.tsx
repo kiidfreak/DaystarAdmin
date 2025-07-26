@@ -155,7 +155,7 @@ export const StudentDashboard: React.FC = () => {
               </div>
               <div className="text-gray-400 text-sm">Attendance Rate</div>
             </div>
-            <Clock className="w-8 h-8 text-purple-400" />
+            <Clock className="w-8 h-8 text-[#001F3F]" />
           </div>
         </Card>
       </div>

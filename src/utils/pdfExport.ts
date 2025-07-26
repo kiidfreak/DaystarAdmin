@@ -58,48 +58,66 @@ export const exportToPDF = (options: ExportOptions) => {
 
   const doc = new jsPDF();
 
-  // Header
+  // Header with Navy Blue theme
+  doc.setFillColor(0, 31, 63); // Navy Blue background
+  doc.rect(0, 0, 210, 30, 'F');
+  
+  // Title with white text
+  doc.setTextColor(255, 255, 255);
   doc.setFontSize(20);
-  doc.setTextColor(75, 0, 130); // Purple color
-  doc.text(title, 20, 20);
-
-  doc.setFontSize(12);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated on: ${date}`, 20, 30);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Tally Check', 20, 15);
+  
+  doc.setFontSize(14);
+  doc.text(title, 20, 25);
+  
+  // Reset text color for content
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  
+  let yPosition = 40;
 
   if (type === 'analytics') {
     // System Statistics Section
     if (systemStats) {
-      doc.setFontSize(14);
-      doc.setTextColor(75, 0, 130);
-      doc.text('System Statistics', 20, 45);
+      doc.setFillColor(240, 249, 255); // Light blue background
+      doc.rect(10, yPosition, 190, 20, 'F');
+      doc.setTextColor(0, 31, 63);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('📊 System Statistics', 15, yPosition + 8);
+      
       doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      let y = 55;
+      doc.setFont('helvetica', 'normal');
+      let y = yPosition + 15;
       Object.entries(systemStats).forEach(([key, value]) => {
-        doc.text(`${key.replace(/([A-Z])/g, ' $1')}: ${value}`, 20, y);
+        doc.text(`${key.replace(/([A-Z])/g, ' $1')}: ${value}`, 15, y);
         y += 7;
       });
+      yPosition = y + 10;
     }
+    
     // Lecturer Statistics Table
     if (Array.isArray(lecturerStats) && lecturerStats.length > 0) {
       const tableHeaders = Object.keys(lecturerStats[0]).map(h => h.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()));
       const tableData = lecturerStats.map(l => Object.values(l));
-      autoTable(doc, {
+      
+      doc.autoTable({
         head: [tableHeaders],
         body: tableData,
-        startY: 100,
+        startY: yPosition,
         styles: {
           fontSize: 8,
           cellPadding: 3,
         },
         headStyles: {
-          fillColor: [75, 0, 130],
+          fillColor: [0, 31, 63], // Navy Blue
           textColor: 255,
           fontStyle: 'bold',
         },
         alternateRowStyles: {
-          fillColor: [245, 245, 245],
+          fillColor: [248, 250, 252],
         },
       });
     }
@@ -108,34 +126,40 @@ export const exportToPDF = (options: ExportOptions) => {
       console.error("attendanceData is undefined or not an array.");
       return;
     }
-    // Statistics
+    
+    // Summary Statistics with Navy Blue theme
     const total = attendanceData.length;
     const present = attendanceData.filter(r => r.status === 'verified').length;
     const absent = attendanceData.filter(r => r.status === 'absent').length;
     const late = attendanceData.filter(r => r.status === 'pending').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
-    doc.setFontSize(14);
-    doc.setTextColor(75, 0, 130);
-    doc.text('Summary Statistics', 20, 45);
-
+    doc.setFillColor(240, 249, 255); // Light blue background
+    doc.rect(10, yPosition, 190, 20, 'F');
+    doc.setTextColor(0, 31, 63);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📊 Summary Statistics', 15, yPosition + 8);
+    
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Total Records: ${total}`, 20, 55);
-    doc.text(`Present: ${present}`, 20, 62);
-    doc.text(`Absent: ${absent}`, 20, 69);
-    doc.text(`Late: ${late}`, 20, 76);
-    doc.text(`Attendance Rate: ${rate}%`, 20, 83);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total Records: ${total}`, 15, yPosition + 15);
+    doc.text(`Present: ${present}`, 60, yPosition + 15);
+    doc.text(`Absent: ${absent}`, 105, yPosition + 15);
+    doc.text(`Late: ${late}`, 150, yPosition + 15);
+    doc.text(`Attendance Rate: ${rate}%`, 15, yPosition + 22);
+    
+    yPosition += 30;
 
-    // Table
+    // Table with Navy Blue theme - Fixed data mapping
     const tableData = attendanceData.map(record => [
-      record.studentName,
-      record.courseCode,
-      record.checkInTime,
-      `${record.sessionStart} - ${record.sessionEnd}`,
-      record.location,
-      record.method,
-      record.status
+      record.studentName || 'Unknown',
+      record.courseCode || 'N/A',
+      record.checkInTime || 'N/A',
+      record.sessionStart && record.sessionEnd ? `${record.sessionStart} - ${record.sessionEnd}` : 'N/A',
+      record.location || 'N/A',
+      record.method || 'N/A',
+      record.status || 'N/A'
     ]);
 
     const tableHeaders = [
@@ -148,21 +172,21 @@ export const exportToPDF = (options: ExportOptions) => {
       'Status'
     ];
 
-    autoTable(doc, {
+    doc.autoTable({
       head: [tableHeaders],
       body: tableData,
-      startY: 95,
+      startY: yPosition,
       styles: {
         fontSize: 8,
         cellPadding: 3,
       },
       headStyles: {
-        fillColor: [75, 0, 130],
+        fillColor: [0, 31, 63], // Navy Blue
         textColor: 255,
         fontStyle: 'bold',
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245],
+        fillColor: [248, 250, 252],
       },
       columnStyles: {
         0: { cellWidth: 30 },
@@ -176,17 +200,23 @@ export const exportToPDF = (options: ExportOptions) => {
     });
   }
 
-  // Footer
-  const pageCount = (doc as any).internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Page ${i} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
-  }
+  // Footer with Navy Blue theme
+  doc.setFillColor(0, 31, 63);
+  doc.rect(0, 280, 210, 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 290);
+  doc.text('Tally Check - Professional Attendance Management', 20, 295);
 
-  // Save the PDF
-  doc.save(`${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  // Save the PDF with proper error handling
+  try {
+    const filename = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    console.log('PDF exported successfully:', filename);
+  } catch (error) {
+    console.error('Error saving PDF:', error);
+  }
 };
 
 export const exportToCSV = (options: any) => {

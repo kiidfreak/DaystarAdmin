@@ -339,7 +339,7 @@ export const UserManagement: React.FC = () => {
     const badges = {
       lecturer: <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">👨‍🏫 Lecturer</Badge>,
       student: <Badge className="bg-green-500/20 text-green-400 border-green-500/30">🎓 Student</Badge>,
-      admin: <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">🛡️ Admin</Badge>
+      admin: <Badge className="bg-[#001F3F]/20 text-[#001F3F] border-[#001F3F]/30">🛡️ Admin</Badge>
     };
     return badges[role as keyof typeof badges] || badges.student;
   };
@@ -378,7 +378,7 @@ export const UserManagement: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -388,7 +388,7 @@ export const UserManagement: React.FC = () => {
           </div>
           <Button
             onClick={() => setShowCreateForm(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
+            className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
           >
             <UserPlus className="w-5 h-5 mr-2" />
             Add User
@@ -403,7 +403,7 @@ export const UserManagement: React.FC = () => {
               onClick={() => setActiveTab('lecturers')}
               className={`flex-1 rounded-xl transition-all duration-300 ${
                 activeTab === 'lecturers' 
-                  ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+                  ? 'bg-[#001F3F]/20 text-[#001F3F] border border-[#001F3F]/30' 
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -415,7 +415,7 @@ export const UserManagement: React.FC = () => {
               onClick={() => setActiveTab('students')}
               className={`flex-1 rounded-xl transition-all duration-300 ${
                 activeTab === 'students' 
-                  ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+                  ? 'bg-[#001F3F]/20 text-[#001F3F] border border-[#001F3F]/30' 
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -427,7 +427,7 @@ export const UserManagement: React.FC = () => {
               onClick={() => setActiveTab('assignments')}
               className={`flex-1 rounded-xl transition-all duration-300 ${
                 activeTab === 'assignments' 
-                  ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+                  ? 'bg-[#001F3F]/20 text-[#001F3F] border border-[#001F3F]/30' 
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -447,7 +447,7 @@ export const UserManagement: React.FC = () => {
                 placeholder="Search users by name, email, or department..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                className="pl-10 bg-white/10 border-white/20 text-white rounded-xl focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20"
               />
             </div>
             <Button
@@ -487,7 +487,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     placeholder="Dr. John Smith"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20"
                     required
                   />
                 </div>

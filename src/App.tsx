@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { UserProvider } from "./contexts/UserContext";
 
+
 const queryClient = new QueryClient();
 
 const App = () => (

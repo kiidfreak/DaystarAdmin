@@ -39,9 +39,10 @@ interface AttendanceReport {
   late: number;
   total: number;
   attendanceRate: number;
+  students?: any[];
 }
 
-// Fetch real attendance data for a course
+// Enhanced attendance data with student names
 const useAttendanceReports = (courseId: string, courseCode: string) => {
   const { data: attendanceRecords, isLoading, error } = useQuery({
     queryKey: ['attendance', 'course', courseId, courseCode],
@@ -49,7 +50,10 @@ const useAttendanceReports = (courseId: string, courseCode: string) => {
       if (!courseCode) return [];
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('*')
+        .select(`
+          *,
+          users!inner(full_name, email, student_number)
+        `)
         .eq('course_code', courseCode)
         .gte('date', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('date', { ascending: false });
@@ -60,15 +64,29 @@ const useAttendanceReports = (courseId: string, courseCode: string) => {
     refetchInterval: 5000, // Real-time updates
   });
 
-  // Group attendance by date and calculate statistics
+  // Group attendance by date and calculate statistics with student names
   const reports: AttendanceReport[] = [];
+  const studentDetails: Record<string, any[]> = {};
+  
   if (attendanceRecords) {
     const groupedByDate = attendanceRecords.reduce((acc, record) => {
       const date = record.date || new Date(record.created_at).toISOString().split('T')[0];
       if (!acc[date]) {
-        acc[date] = { present: 0, absent: 0, late: 0, total: 0 };
+        acc[date] = { present: 0, absent: 0, late: 0, total: 0, students: [] };
       }
       acc[date].total++;
+      
+      // Add student details
+      const studentInfo = {
+        name: record.users?.full_name || 'Unknown Student',
+        email: record.users?.email || '',
+        studentNumber: record.users?.student_number || '',
+        status: record.status,
+        checkInTime: record.check_in_time,
+        method: record.method
+      };
+      acc[date].students.push(studentInfo);
+      
       if (record.status === 'present' || record.status === 'verified') {
         acc[date].present++;
       } else if (record.status === 'pending' || record.status === 'late') {
@@ -77,22 +95,23 @@ const useAttendanceReports = (courseId: string, courseCode: string) => {
         acc[date].absent++;
       }
       return acc;
-    }, {} as Record<string, { present: number; absent: number; late: number; total: number }>);
+    }, {} as Record<string, { present: number; absent: number; late: number; total: number; students: any[] }>);
 
     // Convert to AttendanceReport format
     Object.entries(groupedByDate).forEach(([date, stats]) => {
       reports.push({
         date: new Date(date).toLocaleDateString(),
-        present: (stats as any).present,
-        absent: (stats as any).absent,
-        late: (stats as any).late,
-        total: (stats as any).total,
-        attendanceRate: (stats as any).total > 0 ? Math.round(((stats as any).present / (stats as any).total) * 100) : 0
+        present: stats.present,
+        absent: stats.absent,
+        late: stats.late,
+        total: stats.total,
+        attendanceRate: stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0
       });
+      studentDetails[date] = stats.students;
     });
   }
 
-  return { reports, isLoading, error };
+  return { reports, studentDetails, isLoading, error };
 };
 
 interface ClassesOverviewProps {
@@ -248,14 +267,142 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, `${courseName}_${courseCode}_AttendanceReport.csv`);
   };
-  const exportCourseReportPDF = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
+  const exportCourseReportPDF = (courseName: string, courseCode: string, reports: AttendanceReport[], studentDetails?: Record<string, any[]>) => {
     const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text(`${courseName} (${courseCode}) Attendance Report`, 10, 15);
+    
+    // Add creative header with styling
+    doc.setFillColor(0, 31, 63); // Navy Blue background
+    doc.rect(0, 0, 210, 30, 'F');
+    
+    // Title with white text
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tally Check', 20, 15);
+    
+    doc.setFontSize(14);
+    doc.text(`${courseName} (${courseCode})`, 20, 25);
+    
+    // Reset text color for content
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
-    const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'];
+    doc.setFont('helvetica', 'normal');
+    
+    let yPosition = 40;
+    
+    // Summary section
+    doc.setFillColor(240, 249, 255); // Light blue background
+    doc.rect(10, yPosition, 190, 20, 'F');
+    doc.setTextColor(59, 130, 246);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📊 Attendance Summary', 15, yPosition + 8);
+    
+    const totalPresent = reports.reduce((sum, r) => sum + r.present, 0);
+    const totalAbsent = reports.reduce((sum, r) => sum + r.absent, 0);
+    const totalLate = reports.reduce((sum, r) => sum + r.late, 0);
+    const totalStudents = reports.reduce((sum, r) => sum + r.total, 0);
+    const overallRate = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total Present: ${totalPresent}`, 15, yPosition + 15);
+    doc.text(`Total Absent: ${totalAbsent}`, 60, yPosition + 15);
+    doc.text(`Total Late: ${totalLate}`, 105, yPosition + 15);
+    doc.text(`Overall Rate: ${overallRate}%`, 150, yPosition + 15);
+    
+    yPosition += 30;
+    
+    // Attendance table with enhanced styling
+    const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Rate'];
     const rows = reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`]);
-    doc.autoTable({ head: [headers], body: rows, startY: 25 });
+    
+    doc.autoTable({
+      head: [headers],
+      body: rows,
+      startY: yPosition,
+      styles: {
+        head: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        body: {
+          textColor: [0, 0, 0],
+          fontSize: 9
+        }
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      margin: { top: 10 }
+    });
+    
+    yPosition = doc.lastAutoTable.finalY + 20;
+    
+    // Student details section if available
+    if (studentDetails && Object.keys(studentDetails).length > 0) {
+      doc.setFillColor(240, 249, 255);
+      doc.rect(10, yPosition, 190, 15, 'F');
+      doc.setTextColor(59, 130, 246);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('👥 Student Details', 15, yPosition + 8);
+      
+      yPosition += 20;
+      
+      // Show student details for each date
+      Object.entries(studentDetails).forEach(([date, students]) => {
+        if (students.length > 0) {
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`📅 ${date}`, 15, yPosition);
+          yPosition += 8;
+          
+          const studentHeaders = ['Name', 'Status', 'Check-in Time', 'Method'];
+          const studentRows = students.map(s => [
+            s.name,
+            s.status,
+            s.checkInTime ? new Date(s.checkInTime).toLocaleTimeString() : 'N/A',
+            s.method || 'N/A'
+          ]);
+          
+          doc.autoTable({
+            head: [studentHeaders],
+            body: studentRows,
+            startY: yPosition,
+            styles: {
+              head: {
+                fillColor: [147, 197, 253],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
+              },
+              body: {
+                textColor: [0, 0, 0],
+                fontSize: 8
+              }
+            },
+            alternateRowStyles: {
+              fillColor: [248, 250, 252]
+            },
+            margin: { top: 5 }
+          });
+          
+          yPosition = doc.lastAutoTable.finalY + 15;
+        }
+      });
+    }
+    
+    // Footer
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 280, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 290);
+    doc.text('Tally Check - Professional Attendance Management', 20, 295);
+    
     doc.save(`${courseName}_${courseCode}_AttendanceReport.pdf`);
   };
 
@@ -414,7 +561,6 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
         {/* Export All Courses Buttons */}
         <div className="flex gap-2 mb-4">
           <Button onClick={exportAllCoursesCSV} variant="outline">Export All to CSV</Button>
-          <Button onClick={exportAllCoursesPDF} variant="outline">Export All to PDF</Button>
         </div>
         
         <div className="grid gap-6">
@@ -471,13 +617,162 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
 
 // Add this new component above ClassesOverview
 const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport[]; isSelected: boolean; onSelect: () => void }> = ({ course, reports, isSelected, onSelect }) => {
+  const { reports: courseReports, studentDetails, isLoading } = useAttendanceReports(course.id, course.code);
+  
+  const exportCourseReportCSV = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
+    const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'];
+    const rows = reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`]);
+    const csv = Papa.unparse({ fields: headers, data: rows });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `${courseName}_${courseCode}_AttendanceReport.csv`);
+  };
+
+  const exportCourseReportPDF = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
+    const doc = new jsPDF();
+    
+    // Add creative header with styling
+    doc.setFillColor(59, 130, 246); // Blue background
+    doc.rect(0, 0, 210, 30, 'F');
+    
+    // Title with white text
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tally Check', 20, 15);
+    
+    doc.setFontSize(14);
+    doc.text(`${courseName} (${courseCode})`, 20, 25);
+    
+    // Reset text color for content
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    let yPosition = 40;
+    
+    // Summary section
+    doc.setFillColor(240, 249, 255); // Light blue background
+    doc.rect(10, yPosition, 190, 20, 'F');
+    doc.setTextColor(59, 130, 246);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('📊 Attendance Summary', 15, yPosition + 8);
+    
+    const totalPresent = reports.reduce((sum, r) => sum + r.present, 0);
+    const totalAbsent = reports.reduce((sum, r) => sum + r.absent, 0);
+    const totalLate = reports.reduce((sum, r) => sum + r.late, 0);
+    const totalStudents = reports.reduce((sum, r) => sum + r.total, 0);
+    const overallRate = totalStudents > 0 ? Math.round((totalPresent / totalStudents) * 100) : 0;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Total Present: ${totalPresent}`, 15, yPosition + 15);
+    doc.text(`Total Absent: ${totalAbsent}`, 60, yPosition + 15);
+    doc.text(`Total Late: ${totalLate}`, 105, yPosition + 15);
+    doc.text(`Overall Rate: ${overallRate}%`, 150, yPosition + 15);
+    
+    yPosition += 30;
+    
+    // Attendance table with enhanced styling
+    const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Rate'];
+    const rows = reports.map(r => [r.date, r.present, r.late, r.absent, r.total, `${r.attendanceRate}%`]);
+    
+    doc.autoTable({
+      head: [headers],
+      body: rows,
+      startY: yPosition,
+      styles: {
+        head: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        body: {
+          textColor: [0, 0, 0],
+          fontSize: 9
+        }
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      margin: { top: 10 }
+    });
+    
+    yPosition = doc.lastAutoTable.finalY + 20;
+    
+    // Student details section if available
+    if (studentDetails && Object.keys(studentDetails).length > 0) {
+      doc.setFillColor(240, 249, 255);
+      doc.rect(10, yPosition, 190, 15, 'F');
+      doc.setTextColor(59, 130, 246);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('👥 Student Details', 15, yPosition + 8);
+      
+      yPosition += 20;
+      
+      // Show student details for each date
+      Object.entries(studentDetails).forEach(([date, students]) => {
+        if (students.length > 0) {
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`📅 ${date}`, 15, yPosition);
+          yPosition += 8;
+          
+          const studentHeaders = ['Name', 'Status', 'Check-in Time', 'Method'];
+          const studentRows = students.map(s => [
+            s.name,
+            s.status,
+            s.checkInTime ? new Date(s.checkInTime).toLocaleTimeString() : 'N/A',
+            s.method || 'N/A'
+          ]);
+          
+          doc.autoTable({
+            head: [studentHeaders],
+            body: studentRows,
+            startY: yPosition,
+            styles: {
+              head: {
+                fillColor: [147, 197, 253],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold'
+              },
+              body: {
+                textColor: [0, 0, 0],
+                fontSize: 8
+              }
+            },
+            alternateRowStyles: {
+              fillColor: [248, 250, 252]
+            },
+            margin: { top: 5 }
+          });
+          
+          yPosition = doc.lastAutoTable.finalY + 15;
+        }
+      });
+    }
+    
+    // Footer
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 280, 210, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, 20, 290);
+    doc.text('Tally Check - Professional Attendance Management', 20, 295);
+    
+    doc.save(`${courseName}_${courseCode}_AttendanceReport.pdf`);
+  };
+
   return (
     <div className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors shadow-lg">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center space-x-3 mb-2">
             <h3 className="text-lg font-semibold text-white">{course.name}</h3>
-            <Badge className="bg-sky-blue/20 text-sky-blue border border-sky-blue/30 rounded-xl">
+            <Badge className="bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl">
               {course.code}
             </Badge>
           </div>
@@ -486,7 +781,7 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
         <Button
           size="sm"
           onClick={onSelect}
-          className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl"
+          className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-xl"
         >
           {isSelected ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
           {isSelected ? 'Hide' : 'View'} Reports
@@ -494,21 +789,21 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
       </div>
       <div className="flex flex-wrap gap-4 mb-4 text-gray-300">
         <div className="flex items-center space-x-2">
-          <Clock className="w-4 h-4 text-sky-blue" />
+          <Clock className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Course Code: {course.code}</span>
         </div>
         <div className="flex items-center space-x-2">
-          <MapPin className="w-4 h-4 text-sky-blue" />
+          <MapPin className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Created: {new Date(course.created_at).toLocaleDateString()}</span>
         </div>
         <div className="flex items-center space-x-2">
-          <Users className="w-4 h-4 text-sky-blue" />
+          <Users className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Course ID: {course.id.slice(0, 8)}...</span>
         </div>
       </div>
       <div className="flex items-center space-x-2 mb-4">
-        <Calendar className="w-4 h-4 text-sky-blue" />
-        <Badge className="text-xs border rounded-lg bg-sky-blue/20 text-sky-blue border-sky-blue/30">
+        <Calendar className="w-4 h-4 text-blue-400" />
+        <Badge className="text-xs border rounded-lg bg-blue-500/20 text-blue-400 border-blue-500/30">
           Active Course
         </Badge>
       </div>
@@ -516,41 +811,82 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
         <div className="mt-6">
           <h4 className="text-md font-semibold text-white mb-2">Attendance Reports (Last 2 Weeks)</h4>
           <div className="flex gap-2 mb-4">
-            <Button size="sm" variant="outline" onClick={() => exportCourseReportCSV(course.name, course.code, reports)}>
+            <Button size="sm" variant="outline" onClick={() => exportCourseReportCSV(course.name, course.code, courseReports)}>
               Export CSV
             </Button>
-            <Button size="sm" variant="outline" onClick={() => exportCourseReportPDF(course.name, course.code, reports)}>
-              Export PDF
-            </Button>
           </div>
-          {reports.length === 0 ? (
+          {isLoading ? (
+            <div className="text-gray-400">Loading attendance data...</div>
+          ) : courseReports.length === 0 ? (
             <div className="text-gray-400">No attendance records found.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs text-left text-gray-300">
-                <thead>
-                  <tr className="bg-white/10">
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Present</th>
-                    <th className="px-3 py-2">Late</th>
-                    <th className="px-3 py-2">Absent</th>
-                    <th className="px-3 py-2">Total</th>
-                    <th className="px-3 py-2">Attendance Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((r, i) => (
-                    <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="px-3 py-2">{r.date}</td>
-                      <td className="px-3 py-2">{r.present}</td>
-                      <td className="px-3 py-2">{r.late}</td>
-                      <td className="px-3 py-2">{r.absent}</td>
-                      <td className="px-3 py-2">{r.total}</td>
-                      <td className="px-3 py-2 font-bold" style={{ color: r.attendanceRate >= 80 ? '#22c55e' : r.attendanceRate >= 50 ? '#eab308' : '#ef4444' }}>{r.attendanceRate}%</td>
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs text-left text-gray-300">
+                  <thead>
+                    <tr className="bg-white/10">
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Present</th>
+                      <th className="px-3 py-2">Late</th>
+                      <th className="px-3 py-2">Absent</th>
+                      <th className="px-3 py-2">Total</th>
+                      <th className="px-3 py-2">Attendance Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {courseReports.map((r, i) => (
+                      <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-3 py-2">{r.date}</td>
+                        <td className="px-3 py-2">{r.present}</td>
+                        <td className="px-3 py-2">{r.late}</td>
+                        <td className="px-3 py-2">{r.absent}</td>
+                        <td className="px-3 py-2">{r.total}</td>
+                        <td className="px-3 py-2 font-bold" style={{ color: r.attendanceRate >= 80 ? '#22c55e' : r.attendanceRate >= 50 ? '#eab308' : '#ef4444' }}>{r.attendanceRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Student Details Section */}
+              {studentDetails && Object.keys(studentDetails).length > 0 && (
+                <div className="mt-6">
+                  <h5 className="text-sm font-semibold text-white mb-3">👥 Student Details</h5>
+                  <div className="space-y-4">
+                    {Object.entries(studentDetails).map(([date, students]) => (
+                      <div key={date} className="bg-white/5 rounded-lg p-4">
+                        <h6 className="text-xs font-semibold text-blue-400 mb-2">📅 {date}</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {students.map((student, idx) => (
+                            <div key={idx} className="bg-white/5 rounded p-2 text-xs">
+                              <div className="font-medium text-white">{student.name}</div>
+                              <div className="text-gray-400">
+                                Status: <span className={`${
+                                  student.status === 'present' || student.status === 'verified' 
+                                    ? 'text-green-400' 
+                                    : student.status === 'late' 
+                                    ? 'text-yellow-400' 
+                                    : 'text-red-400'
+                                }`}>{student.status}</span>
+                              </div>
+                              {student.checkInTime && (
+                                <div className="text-gray-400">
+                                  Time: {new Date(student.checkInTime).toLocaleTimeString()}
+                                </div>
+                              )}
+                              {student.method && (
+                                <div className="text-gray-400">
+                                  Method: {student.method}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

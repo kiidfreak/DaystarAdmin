@@ -14,7 +14,7 @@ export const colors = {
     900: '#1e3a8a',
   },
   
-  // Sky blue (UniConnect brand color)
+  // Sky blue (Tally Check brand color)
   skyBlue: {
     50: '#f0f9ff',
     100: '#e0f2fe',

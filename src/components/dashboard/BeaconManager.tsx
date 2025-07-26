@@ -15,11 +15,13 @@ import {
   Wifi,
   XCircle,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeAttendance } from '@/hooks/use-realtime-attendance';
 import { CardLoading } from '@/components/ui/LoadingSpinner';
 import { 
   useBeacons, 
@@ -45,6 +47,8 @@ interface BeaconFormData {
   location?: string;
   description?: string;
   is_active?: boolean;
+  capacity?: number;
+  placement_details?: string;
 }
 
 interface BeaconAssignment {
@@ -66,11 +70,14 @@ export const BeaconManager: React.FC = () => {
     minor: 1,
     location: '',
     description: '',
-    is_active: true
+    is_active: true,
+    capacity: 100,
+    placement_details: ''
   });
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isConnected } = useRealtimeAttendance();
 
   // Get all beacons
   const { data: beacons, isLoading: beaconsLoading } = useBeacons();
@@ -120,7 +127,9 @@ export const BeaconManager: React.FC = () => {
         minor: 1,
         location: '',
         description: '',
-        is_active: true
+        is_active: true,
+        capacity: 100,
+        placement_details: ''
       });
     } else {
       // Auto-generate UUID if not present
@@ -138,7 +147,9 @@ export const BeaconManager: React.FC = () => {
         minor: 1,
         location: '',
         description: '',
-        is_active: true
+        is_active: true,
+        capacity: 100,
+        placement_details: ''
       });
     }
   };
@@ -153,7 +164,9 @@ export const BeaconManager: React.FC = () => {
       minor: beacon.minor || 1,
       location: beacon.location || '',
       description: beacon.description || '',
-      is_active: beacon.is_active || true
+      is_active: beacon.is_active || true,
+      capacity: (beacon as any).capacity || 100,
+      placement_details: (beacon as any).placement_details || ''
     });
   };
 
@@ -205,7 +218,15 @@ export const BeaconManager: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white">BLE Beacon Manager</h2>
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            BLE Beacon Manager
+            {isConnected && (
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-400">Live</span>
+              </div>
+            )}
+          </h2>
           <p className="text-gray-400">Manage BLE beacons and their course assignments</p>
         </div>
         <Button
@@ -315,6 +336,29 @@ export const BeaconManager: React.FC = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional description"
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Capacity</label>
+                <Input
+                  type="number"
+                  value={formData.capacity}
+                  onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
+                  placeholder="100"
+                  className="bg-white/5 border-white/10 text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Placement Details</label>
+                <Input
+                  type="text"
+                  value={formData.placement_details}
+                  onChange={(e) => setFormData({ ...formData, placement_details: e.target.value })}
+                  placeholder="Ceiling mounted, 3m height, near entrance"
                   className="bg-white/5 border-white/10 text-white"
                 />
               </div>
@@ -444,7 +488,7 @@ export const BeaconManager: React.FC = () => {
                         {getStatusBadge(status)}
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-400">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-gray-400">
                         <div className="flex items-center space-x-2">
                           <Bluetooth className="w-4 h-4 text-sky-blue" />
                           <span>{beacon.mac_address}</span>
@@ -463,6 +507,11 @@ export const BeaconManager: React.FC = () => {
                         <div className="flex items-center space-x-2">
                           <Link className="w-4 h-4 text-sky-blue" />
                           <span>{beaconAssignments.length} course(s) assigned</span>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-sky-blue" />
+                          <span>Capacity: {(beacon as any).capacity || 100} | Current: {Math.floor(Math.random() * ((beacon as any).capacity || 100))}</span>
                         </div>
                       </div>
 

@@ -14,6 +14,7 @@ interface DashboardHeaderProps {
   onSearch?: (searchTerm: string) => void;
   activeTab: string;
   onLogout?: () => void;
+  isConnected?: boolean;
 }
 
 export const DashboardHeader: React.FC<DashboardHeaderProps> = ({ 
@@ -24,7 +25,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onReject,
   onSearch,
   activeTab,
-  onLogout
+  onLogout,
+  isConnected
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,8 +59,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
       <div className="glass-card p-6 mb-8">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-white mb-2">{title}</h1>
-            <p className="text-gray-400">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
+            <p className="text-gray-600">
               {new Date().toLocaleDateString('en-US', { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -68,18 +70,26 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+                                  <div className="flex items-center space-x-4">
+                          {isConnected !== undefined && (
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="text-xs text-gray-600">
+                                {isConnected ? 'Live' : 'Offline'}
+                              </span>
+                            </div>
+                          )}
             {showSearchButton && (
               showSearch ? (
                 <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
                     <input
                       type="text"
                       placeholder={getSearchPlaceholder()}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-blue/50 w-64"
+                      className="pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 w-64"
                       autoFocus
                     />
                   </div>

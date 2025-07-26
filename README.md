@@ -1,8 +1,8 @@
-# UniConnect Web Admin Dashboard
+# Tally Check Web Admin Dashboard
 
 ## Project Overview
 
-UniConnect is a comprehensive university attendance management system with a web admin dashboard that connects to your existing Supabase database and mobile app.
+Tally Check is a comprehensive university attendance management system with a web admin dashboard that connects to your existing Supabase database and mobile app.
 
 ## Features
 

@@ -71,17 +71,17 @@ export const ProfilePopup: React.FC<ProfilePopupProps> = ({
 
   const getRoleBadgeColor = (role: string) => {
     const colors = {
-      lecturer: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      admin: 'bg-red-500/20 text-red-400 border-red-500/30'
+      lecturer: 'bg-blue-100 text-blue-700 border-blue-200',
+      admin: 'bg-blue-100 text-blue-700 border-blue-200'
     };
     return colors[role as keyof typeof colors] || colors.lecturer;
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="glass-card border-white/10 text-white max-w-md z-[99999]">
+      <DialogContent className="glass-card border-gray-200 text-gray-900 max-w-md z-[99999]">
         <DialogHeader>
-          <DialogTitle className="text-white">Profile</DialogTitle>
+          <DialogTitle className="text-gray-900">Profile</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
@@ -89,12 +89,12 @@ export const ProfilePopup: React.FC<ProfilePopupProps> = ({
           <div className="flex items-center space-x-4">
             <Avatar className="w-16 h-16">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-sky-blue/20 text-sky-blue text-lg font-semibold">
+              <AvatarFallback className="bg-blue-500/20 text-blue-600 text-lg font-semibold">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-white">{userInfo.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{userInfo.name}</h3>
               <Badge className={`text-xs border rounded-lg ${getRoleBadgeColor(user?.role || userRole)}`}>
                 {(user?.role || userRole).replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </Badge>
@@ -104,45 +104,45 @@ export const ProfilePopup: React.FC<ProfilePopupProps> = ({
           {/* Profile Details */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
-              <Mail className="w-4 h-4 text-sky-blue" />
-              <span className="text-gray-300">{userInfo.email}</span>
+              <Mail className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700">{userInfo.email}</span>
             </div>
             
             <div className="flex items-center space-x-3">
-              <User className="w-4 h-4 text-sky-blue" />
-              <span className="text-gray-300">Employee ID: {userInfo.employeeId}</span>
+              <User className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700">Employee ID: {userInfo.employeeId}</span>
             </div>
             
             <div className="flex items-center space-x-3">
-              <Calendar className="w-4 h-4 text-sky-blue" />
-              <span className="text-gray-300">Department: {userInfo.department}</span>
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700">Department: {userInfo.department}</span>
             </div>
 
             {userInfo.phone && (
               <div className="flex items-center space-x-3">
-                <Phone className="w-4 h-4 text-sky-blue" />
-                <span className="text-gray-300">Phone: {userInfo.phone}</span>
+                <Phone className="w-4 h-4 text-blue-600" />
+                <span className="text-gray-700">Phone: {userInfo.phone}</span>
               </div>
             )}
 
             {userInfo.officeLocation && (
               <div className="flex items-center space-x-3">
-                <MapPin className="w-4 h-4 text-sky-blue" />
-                <span className="text-gray-300">Office: {userInfo.officeLocation}</span>
+                <MapPin className="w-4 h-4 text-blue-600" />
+                <span className="text-gray-700">Office: {userInfo.officeLocation}</span>
               </div>
             )}
             
             <div className="flex items-center space-x-3">
-              <Clock className="w-4 h-4 text-sky-blue" />
-              <span className="text-gray-300">Joined: {new Date(userInfo.joinDate).toLocaleDateString()}</span>
+              <Clock className="w-4 h-4 text-blue-600" />
+              <span className="text-gray-700">Joined: {new Date(userInfo.joinDate).toLocaleDateString()}</span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-3 pt-4 border-t border-white/10">
+          <div className="space-y-3 pt-4 border-t border-gray-200">
             <Button 
               variant="ghost" 
-              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              className="w-full justify-start text-blue-600 hover:text-blue-700 hover:bg-blue-50"
               onClick={handleLogout}
             >
               <LogOut className="w-4 h-4 mr-3" />

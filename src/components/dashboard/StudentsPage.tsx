@@ -220,7 +220,7 @@ export const StudentsPage: React.FC = () => {
               placeholder="Search students by name, email, or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                              className="w-full pl-10 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20"
             />
           </div>
           
@@ -228,21 +228,21 @@ export const StudentsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400"
+              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20 bg-gray-800 text-gray-900 font-medium"
             >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="all" className="bg-gray-800 text-gray-900">All Status</option>
+              <option value="active" className="bg-gray-800 text-gray-900">Active</option>
+              <option value="inactive" className="bg-gray-800 text-gray-900">Inactive</option>
             </select>
             
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400"
+              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20 bg-gray-800 text-gray-900 font-medium"
             >
-              <option value="all">All Departments</option>
+              <option value="all" className="bg-gray-800 text-gray-900">All Departments</option>
               {departments.map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
+                <option key={dept} value={dept} className="bg-gray-800 text-gray-900">{dept}</option>
               ))}
             </select>
           </div>
@@ -280,11 +280,11 @@ export const StudentsPage: React.FC = () => {
                 </tr>
               ) : (
                 paginatedStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={student.id} className="hover:bg-blue-50 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-purple-600/20 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-purple-400" />
+                        <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
                           <div className="text-white font-medium">{student.full_name}</div>

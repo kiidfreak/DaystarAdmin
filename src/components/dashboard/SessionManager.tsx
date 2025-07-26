@@ -560,7 +560,7 @@ export const SessionManager: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -571,7 +571,7 @@ export const SessionManager: React.FC = () => {
           <div className="flex items-center">
             <Button
               onClick={() => setShowCreateForm(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg mr-2"
+              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg mr-2"
             >
               <Plus className="w-5 h-5 mr-2" />
               Create Session
@@ -723,7 +723,7 @@ export const SessionManager: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={createSession.isPending || updateSession.isPending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
+                  className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
                 >
                   {createSession.isPending || updateSession.isPending ? 'Saving...' : (editingSession ? 'Update Session' : 'Create Session')}
                 </Button>
@@ -770,7 +770,7 @@ export const SessionManager: React.FC = () => {
               <p className="text-gray-400 mb-6">Try adjusting your search or filters.</p>
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl"
+                className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Session
@@ -791,9 +791,9 @@ export const SessionManager: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-4 mb-4">
-                          <div className="bg-purple-600/20 p-3 rounded-xl">
-                            <BookOpen className="w-6 h-6 text-purple-400" />
-                          </div>
+                                          <div className="bg-[#001F3F]/20 p-3 rounded-xl">
+                  <BookOpen className="w-6 h-6 text-[#001F3F]" />
+                </div>
                           <div>
                             <h4 className="text-xl font-semibold text-white mb-1">
                               {course?.name || 'Unknown Course'}

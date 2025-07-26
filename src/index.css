@@ -3,48 +3,38 @@
 @tailwind components;
 @tailwind utilities;
 
-/* UniConnect Glass UI Design System */
+/* Tally Check Navy Blue & White Professional Design System */
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 200 98% 81%;
-    --primary-foreground: 240 10% 3.9%;
-
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 200 98% 81%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 240 10% 3.9%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 200 98% 81%;
-    --sidebar-primary-foreground: 240 10% 3.9%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 200 98% 81%;
+    /* Tally Check Navy Blue & White Color Palette */
+    --background: 220 25% 8%; /* #001F3F - Deep Navy */
+    --foreground: 0 0% 100%; /* #FFFFFF - White */
+    --card: 0 0% 100%; /* #FFFFFF - White */
+    --card-foreground: 0 0% 10%; /* #1A1A1A - Dark Text */
+    --popover: 0 0% 100%; /* #FFFFFF - White */
+    --popover-foreground: 0 0% 10%; /* #1A1A1A - Dark Text */
+    --primary: 220 25% 8%; /* #001F3F - Navy Blue */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF - White */
+    --secondary: 220 25% 15%; /* #1E3A5F - Lighter Navy */
+    --secondary-foreground: 0 0% 100%; /* #FFFFFF - White */
+    --muted: 220 25% 95%; /* #F8FAFC - Very Light Navy */
+    --muted-foreground: 0 0% 45%; /* #737373 - Gray */
+    --accent: 220 25% 8%; /* #001F3F - Navy Blue */
+    --accent-foreground: 0 0% 100%; /* #FFFFFF - White */
+    --destructive: 0 84% 60%; /* #EF4444 - Red */
+    --destructive-foreground: 0 0% 100%; /* #FFFFFF - White */
+    --border: 220 25% 90%; /* #E2E8F0 - Light Navy Border */
+    --input: 0 0% 100%; /* #FFFFFF - White */
+    --ring: 220 25% 8%; /* #001F3F - Navy Blue */
+    --radius: 0.75rem;
+    
+    /* Custom Tally Check Colors */
+    --tally-success: 142 76% 36%; /* #22C55E - Green */
+    --tally-warning: 43 96% 56%; /* #F59E0B - Amber */
+    --tally-error: 0 84% 60%; /* #EF4444 - Red */
+    --tally-surface: 0 0% 100%; /* #FFFFFF - White */
+    --tally-surface-hover: 220 25% 98%; /* #F8FAFC - Very Light Navy */
   }
 }
 
@@ -54,74 +44,316 @@
   }
 
   body {
-    @apply bg-gradient-to-br from-charcoal via-slate-900 to-slate-800 text-foreground min-h-screen;
+    @apply text-foreground min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F];
     font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    scroll-behavior: smooth;
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl;
+    @apply bg-white border border-gray-200 rounded-xl shadow-lg backdrop-blur-sm;
+    transition: all 0.3s ease-in-out;
+  }
+
+  .glass-card:hover {
+    @apply shadow-xl transform scale-[1.02];
   }
 
   .glass-button {
-    @apply bg-sky-blue/20 hover:bg-sky-blue/30 backdrop-blur-sm border border-sky-blue/30 rounded-2xl transition-all duration-300 hover:scale-105;
+    @apply bg-[#001F3F] hover:bg-[#1E3A5F] text-white border border-[#001F3F] rounded-xl px-6 py-3 font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg;
+  }
+
+  .glass-button:active {
+    @apply transform scale-95;
   }
 
   .status-online {
-    @apply bg-green-500/20 text-green-400 border-green-500/30;
+    @apply bg-green-100 text-green-700 border border-green-200 rounded-lg px-3 py-1 text-sm font-medium;
   }
 
   .status-warning {
-    @apply bg-yellow-500/20 text-yellow-400 border-yellow-500/30;
+    @apply bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg px-3 py-1 text-sm font-medium;
   }
 
   .status-offline {
-    @apply bg-red-500/20 text-red-400 border-red-500/30;
+    @apply bg-red-100 text-red-700 border border-red-200 rounded-lg px-3 py-1 text-sm font-medium;
   }
 
   .metric-card {
-    @apply glass-card p-6 hover:bg-white/10 transition-all duration-300 hover:scale-[1.02];
+    @apply glass-card p-6 transition-all duration-300 hover:scale-[1.02];
   }
 
   .sidebar-glass {
-    @apply bg-charcoal/80 backdrop-blur-2xl border-r border-white/10;
+    @apply bg-white border-r border-gray-200 shadow-lg backdrop-blur-sm min-h-screen;
   }
 
+  /* Enhanced Dropdown Styling */
   select, .custom-select {
     width: 100%;
     height: 3.25rem;
     padding: 0.75rem 2.5rem 0.75rem 1rem;
-    border-radius: 1rem;
-    border: 2.5px solid #38bdf8;
-    background: rgba(30,41,59,0.98);
-    color: #fff;
+    border-radius: 0.75rem;
     font-size: 1.15rem;
     font-weight: 600;
-    box-shadow: 0 2px 16px 0 rgba(56,189,248,0.10);
+    transition: all 0.3s ease;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+    color: #1a1a1a;
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.05);
+  }
+
+  select, .custom-select {
     appearance: none;
-    transition: border 0.2s, box-shadow 0.2s;
+    transition: border 0.2s, box-shadow 0.2s, transform 0.2s;
     outline: none;
-    background-image: url('data:image/svg+xml;utf8,<svg fill="white" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
     background-repeat: no-repeat;
     background-position: right 1rem center;
     background-size: 1.5em;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23001F3F" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
   }
+
   select:focus, .custom-select:focus {
-    border-color: #0ea5e9;
-    box-shadow: 0 0 0 3px #38bdf8aa;
+    border-color: #001F3F;
+    box-shadow: 0 0 0 3px rgba(0,31,63,0.1);
+    transform: translateY(-1px);
   }
+
   select:hover, .custom-select:hover {
-    border-color: #0ea5e9;
+    border-color: #001F3F;
+    transform: translateY(-1px);
   }
+
   select option, .custom-select option {
-    background: #1e293b;
-    color: #fff;
+    background: #fff;
+    color: #1a1a1a;
     font-size: 1.1rem;
     font-weight: 500;
     padding: 0.75rem 1rem;
   }
-  .glow-badge {
-    @apply animate-pulse shadow-lg ring-2 ring-red-500 ring-offset-2;
+
+  /* Enhanced Form Input Styling */
+  input, textarea, select {
+    @apply text-gray-900 bg-white border-gray-200;
   }
+
+  input:focus, textarea:focus, select:focus {
+    @apply text-gray-900 border-[#001F3F] ring-[#001F3F]/20;
+  }
+
+  input::placeholder, textarea::placeholder {
+    @apply text-gray-500;
+  }
+
+  /* Enhanced Select Component Styling */
+  .select-trigger {
+    @apply flex h-12 w-full items-center justify-between rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm ring-offset-background placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#001F3F] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-300 hover:border-[#001F3F] hover:shadow-md text-gray-900 font-medium;
+  }
+
+  .select-content {
+    @apply relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border bg-white text-gray-900 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2;
+  }
+
+  .select-item {
+    @apply relative flex w-full cursor-default select-none items-center rounded-lg py-3 pl-10 pr-4 text-sm outline-none focus:bg-[#001F3F] focus:text-white hover:bg-[#001F3F]/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors duration-200 text-gray-900;
+  }
+
+  .select-item[data-state="checked"] {
+    @apply bg-[#001F3F] text-white;
+  }
+
+  .select-value {
+    @apply text-gray-900 font-medium;
+  }
+
+  /* Ensure dropdown text is always visible */
+  .select-trigger span {
+    @apply text-gray-900 font-medium;
+  }
+
+  .glow-badge {
+    @apply animate-pulse shadow-lg ring-2 ring-[#001F3F] ring-offset-2;
+  }
+
+  /* Tally Check Professional Animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  @keyframes slideInFromRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .slide-in-right {
+    animation: slideInFromRight 0.4s ease-out;
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .scale-in {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  /* Loading Spinner */
+  .tally-spinner {
+    @apply animate-spin rounded-full border-4 border-gray-200 border-t-[#001F3F] h-8 w-8;
+  }
+
+  /* Professional Card Styles */
+  .professional-card {
+    @apply bg-white rounded-xl shadow-lg border border-gray-200 p-6 transition-all duration-300 hover:shadow-xl hover:scale-[1.02];
+  }
+
+  /* Button Styles */
+  .btn-primary {
+    @apply bg-[#001F3F] hover:bg-[#1E3A5F] text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105 border border-gray-300;
+  }
+
+  /* Table Styles */
+  .professional-table {
+    @apply w-full bg-white rounded-xl overflow-hidden shadow-lg;
+  }
+
+  .professional-table th {
+    @apply bg-[#001F3F] text-white px-6 py-4 text-left font-semibold;
+  }
+
+  .professional-table td {
+    @apply px-6 py-4 border-b border-gray-100 text-gray-900;
+  }
+
+  .professional-table tr:hover {
+    @apply bg-gray-50 transition-colors duration-200;
+  }
+}
+
+/* Remove black hover states and replace with blue - FIXED FOR READABILITY */
+button:hover,
+.btn:hover,
+[role="button"]:hover {
+  @apply bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 hover:border-blue-400;
+}
+
+/* Form inputs and selects */
+input:hover,
+textarea:hover,
+select:hover {
+  @apply border-blue-400 ring-blue-400/20;
+}
+
+/* Focus states */
+input:focus,
+textarea:focus,
+select:focus {
+  @apply border-blue-600 ring-blue-600/20 text-gray-900;
+}
+
+/* Button variants */
+.btn-primary:hover,
+.btn-secondary:hover {
+  @apply bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 hover:border-blue-400;
+}
+
+/* Ghost buttons */
+.btn-ghost:hover,
+button[data-variant="ghost"]:hover {
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+}
+
+/* Outline buttons */
+.btn-outline:hover,
+button[data-variant="outline"]:hover {
+  @apply bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 hover:border-blue-400;
+}
+
+/* Table row hover */
+tr:hover,
+.table-row:hover {
+  @apply bg-blue-50 hover:bg-blue-100;
+}
+
+/* Card hover */
+.card:hover,
+[data-card]:hover {
+  @apply border-blue-200 shadow-blue-100;
+}
+
+/* Link hover */
+a:hover,
+[data-link]:hover {
+  @apply text-blue-600 hover:text-blue-700;
+}
+
+/* Navigation items */
+nav a:hover,
+.nav-item:hover {
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+}
+
+/* Dropdown items */
+.dropdown-item:hover,
+[data-dropdown-item]:hover {
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+}
+
+/* Menu items */
+.menu-item:hover,
+[data-menu-item]:hover {
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+}
+
+/* Badge hover */
+.badge:hover,
+[data-badge]:hover {
+  @apply bg-blue-100 text-blue-700 border-blue-200;
+}
+
+/* Icon hover */
+.icon:hover,
+[data-icon]:hover {
+  @apply text-blue-600 hover:text-blue-700;
+}
+
+/* Custom hover utilities */
+.hover-blue:hover {
+  @apply bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 hover:border-blue-400;
+}
+
+.hover-blue-light:hover {
+  @apply bg-blue-50 text-blue-700 hover:bg-blue-100;
+}
+
+.hover-blue-border:hover {
+  @apply border-blue-400 ring-blue-400/20;
 }

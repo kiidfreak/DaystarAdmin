@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { qrCodeApi } from '@/lib/api';
-import { CardLoading } from '@/components/ui/LoadingSpinner';
+import { CardLoading, PageLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -133,7 +133,7 @@ export const QRGenerator: React.FC = () => {
   };
 
   if (coursesLoading) {
-    return <CardLoading text="Loading courses..." />;
+    return <PageLoading text="Loading QR Generator..." />;
   }
 
   return (
@@ -152,7 +152,7 @@ export const QRGenerator: React.FC = () => {
             <select
               value={selectedCourse}
               onChange={(e) => setSelectedCourse(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 text-white rounded-2xl px-4 py-3 focus:outline-none focus:border-purple-400"
+                              className="w-full bg-white/5 border border-white/10 text-white rounded-2xl px-4 py-3 focus:outline-none focus:border-[#001F3F]"
             >
               <option value="">Select a course</option>
               {courses?.map((course) => (

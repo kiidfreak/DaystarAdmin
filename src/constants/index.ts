@@ -5,7 +5,7 @@ export * from './spacing';
 
 // App-specific constants
 export const APP_CONSTANTS = {
-  name: 'UniConnect',
+  name: 'Tally Check',
   version: '1.0.0',
   description: 'University Attendance Management System',
   

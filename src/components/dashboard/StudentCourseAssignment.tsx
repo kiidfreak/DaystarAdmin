@@ -67,6 +67,7 @@ export const StudentCourseAssignment: React.FC = () => {
   const [selectedLecturerCourse, setSelectedLecturerCourse] = useState('');
   const [lecturerSearch, setLecturerSearch] = useState('');
   const [lecturerAssigning, setLecturerAssigning] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -85,7 +86,7 @@ export const StudentCourseAssignment: React.FC = () => {
       return data || [];
     },
   });
-  const [studentSearch, setStudentSearch] = useState('');
+  
   const filteredStudents = allStudents?.filter(student =>
     student.full_name.toLowerCase().includes(studentSearch.toLowerCase()) ||
     student.email.toLowerCase().includes(studentSearch.toLowerCase()) ||
@@ -98,46 +99,140 @@ export const StudentCourseAssignment: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('courses')
-        .select(`
-          *,
-          users!courses_instructor_id_fkey (
-            id,
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching courses:', error);
+        return [];
+      }
       return data || [];
     },
   });
 
-  // Get student enrollments
+  // Get student enrollments - simplified to work with existing tables
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ['student-enrollments'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('student_enrollments_view')
-        .select('*')
-        .order('student_name');
-      
-      if (error) throw error;
-      return data || [];
+      try {
+        // Try to get enrollments from student_course_enrollments table
+        const { data, error } = await supabase
+          .from('student_course_enrollments')
+          .select(`
+            *,
+            users!student_course_enrollments_student_id_fkey (
+              id,
+              full_name,
+              email,
+              student_number
+            ),
+            courses!student_course_enrollments_course_id_fkey (
+              id,
+              name,
+              code
+            )
+          `);
+        
+        if (error) {
+          console.error('Error fetching enrollments:', error);
+          return [];
+        }
+        
+        // Transform data to match expected format
+        return data?.map(enrollment => ({
+          enrollment_id: enrollment.id,
+          student_id: enrollment.student_id,
+          student_name: enrollment.users?.full_name || 'Unknown',
+          student_email: enrollment.users?.email || '',
+          student_number: enrollment.users?.student_number || '',
+          student_department: 'General',
+          course_id: enrollment.course_id,
+          course_name: enrollment.courses?.name || 'Unknown Course',
+          course_code: enrollment.courses?.code || '',
+          instructor_id: null,
+          instructor_name: null,
+          enrollment_status: enrollment.status || 'active',
+          enrollment_date: enrollment.created_at || new Date().toISOString(),
+          assigned_by: enrollment.assigned_by,
+          assigned_by_name: null,
+          assigned_at: enrollment.created_at || new Date().toISOString(),
+          notes: enrollment.notes
+        })) || [];
+      } catch (error) {
+        console.error('Error in enrollments query:', error);
+        return [];
+      }
     },
   });
 
-  // Get course assignment stats
+  // Get course assignment stats - simplified
   const { data: assignmentStats, isLoading: statsLoading } = useQuery({
     queryKey: ['course-assignment-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('get_course_assignment_stats');
-      
-      if (error) throw error;
-      return data || [];
+      try {
+        // Simple stats calculation
+        const stats = courses?.map(course => ({
+          course_name: course.name || 'Unknown',
+          course_code: course.code || '',
+          total_students: enrollments?.filter(e => e.course_id === course.id).length || 0,
+          active_students: enrollments?.filter(e => e.course_id === course.id && e.enrollment_status === 'active').length || 0,
+          instructor_name: null
+        })) || [];
+        
+        return stats;
+      } catch (error) {
+        console.error('Error calculating stats:', error);
+        return [];
+      }
     },
+    enabled: !!courses && !!enrollments, // Only run when courses and enrollments are loaded
   });
+
+  // Calculate statistics
+  const totalStudents = allStudents?.length || 0;
+  const activeEnrollments = enrollments?.filter(e => e.enrollment_status === 'active').length || 0;
+  const pendingEnrollments = enrollments?.filter(e => e.enrollment_status === 'pending').length || 0;
+  const totalCourses = courses?.length || 0;
+
+  // Show loading state while data is being fetched
+  if (studentsLoading || coursesLoading || enrollmentsLoading || statsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="glass-card p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading Course Assignment Data</h2>
+            <p className="text-gray-400">Please wait while we fetch the latest information...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if there are issues
+  const hasError = !allStudents || !courses || !enrollments;
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="glass-card p-12 text-center">
+            <div className="mb-4">
+              <AlertCircle className="w-16 h-16 text-red-400 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Course Assignment Dashboard</h2>
+            <p className="text-gray-400 mb-6">Welcome to the Course Assignment page. You can manage student course enrollments here.</p>
+            <Button
+              onClick={() => setShowAssignmentModal(true)}
+              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Start Assigning Courses
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Assign courses to student
   const assignCourses = useMutation({
@@ -297,80 +392,153 @@ export const StudentCourseAssignment: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  if (coursesLoading || enrollmentsLoading || statsLoading) {
-    return <PageLoading text="Loading course assignments..." />;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">Student Course Assignment</h2>
-            <p className="text-gray-400">Manage student course enrollments and assignments</p>
+            <h2 className="text-3xl font-bold text-white mb-2">Course Assignment</h2>
+            <p className="text-gray-400">Manage student course enrollments and instructor assignments</p>
           </div>
           <Button
             onClick={() => setShowAssignmentModal(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
+            className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
           >
-            <UserPlus className="w-5 h-5 mr-2" />
+            <Plus className="w-5 h-5 mr-2" />
             Assign Courses
           </Button>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="bg-blue-600/20 p-3 rounded-xl">
-                <Users className="w-6 h-6 text-blue-400" />
-              </div>
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Unassigned Students</p>
-                <p className="text-2xl font-bold text-white">{enrollments?.filter(e => e.enrollment_status === 'pending').length || 0}</p>
+                <div className="text-2xl font-bold text-blue-400">{totalStudents}</div>
+                <div className="text-gray-400 text-sm">Total Students</div>
+              </div>
+              <div className="bg-[#001F3F]/20 p-3 rounded-xl">
+                <GraduationCap className="w-6 h-6 text-[#001F3F]" />
               </div>
             </div>
-          </Card>
+          </div>
 
-          <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="bg-green-600/20 p-3 rounded-xl">
-                <BookOpen className="w-6 h-6 text-green-400" />
-              </div>
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Total Enrollments</p>
-                <p className="text-2xl font-bold text-white">{enrollments?.length || 0}</p>
+                <div className="text-2xl font-bold text-green-400">{activeEnrollments}</div>
+                <div className="text-gray-400 text-sm">Active Enrollments</div>
+              </div>
+              <div className="bg-green-500/20 p-3 rounded-xl">
+                <CheckCircle className="w-6 h-6 text-green-400" />
               </div>
             </div>
-          </Card>
+          </div>
 
-          <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="bg-purple-600/20 p-3 rounded-xl">
-                <GraduationCap className="w-6 h-6 text-purple-400" />
-              </div>
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Active Courses</p>
-                <p className="text-2xl font-bold text-white">{courses?.length || 0}</p>
+                <div className="text-2xl font-bold text-yellow-400">{pendingEnrollments}</div>
+                <div className="text-gray-400 text-sm">Pending Assignments</div>
               </div>
-            </div>
-          </Card>
-
-          <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-            <div className="flex items-center space-x-4">
-              <div className="bg-yellow-600/20 p-3 rounded-xl">
+              <div className="bg-yellow-500/20 p-3 rounded-xl">
                 <AlertCircle className="w-6 h-6 text-yellow-400" />
               </div>
+            </div>
+          </div>
+
+          <div className="glass-card p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Pending Assignments</p>
-                <p className="text-2xl font-bold text-white">
-                  {enrollments?.filter(e => e.enrollment_status === 'pending').length || 0}
-                </p>
+                <div className="text-2xl font-bold text-orange-400">{totalCourses}</div>
+                <div className="text-gray-400 text-sm">Available Courses</div>
+              </div>
+              <div className="bg-orange-500/20 p-3 rounded-xl">
+                <BookOpen className="w-6 h-6 text-orange-400" />
               </div>
             </div>
-          </Card>
+          </div>
         </div>
+
+        {/* Fallback display if no data */}
+        {(!enrollments || enrollments.length === 0) && !enrollmentsLoading && (
+          <div className="glass-card p-12 text-center">
+            <div className="mb-4">
+              <BookOpen className="w-16 h-16 text-gray-400 mx-auto" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">No Course Assignments Found</h3>
+            <p className="text-gray-400 mb-6">Start by assigning courses to students using the button above.</p>
+            <Button
+              onClick={() => setShowAssignmentModal(true)}
+              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Assign First Course
+            </Button>
+          </div>
+        )}
+
+        {/* Search and Filters */}
+        {enrollments && enrollments.length > 0 && (
+          <div className="glass-card p-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by student name, email, or course..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border-white/20 text-white rounded-xl focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20 placeholder:text-gray-400"
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-4 py-3 rounded-xl transition-colors ${
+                    statusFilter === 'all' 
+                      ? 'bg-[#001F3F] text-white' 
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setStatusFilter('active')}
+                  className={`px-4 py-3 rounded-xl transition-colors ${
+                    statusFilter === 'active' 
+                      ? 'bg-[#001F3F] text-white' 
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setStatusFilter('inactive')}
+                  className={`px-4 py-3 rounded-xl transition-colors ${
+                    statusFilter === 'inactive' 
+                      ? 'bg-[#001F3F] text-white' 
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  Inactive
+                </button>
+                <button
+                  onClick={() => setStatusFilter('pending')}
+                  className={`px-4 py-3 rounded-xl transition-colors ${
+                    statusFilter === 'pending' 
+                      ? 'bg-[#001F3F] text-white' 
+                      : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                  }`}
+                >
+                  Pending
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Course Assignment Stats */}
         <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
@@ -405,116 +573,79 @@ export const StudentCourseAssignment: React.FC = () => {
         </Card>
 
         {/* Student Enrollments */}
-        <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-white">Student Enrollments</h3>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input
-                  placeholder="Search students or courses..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                />
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                  className={`rounded-xl ${statusFilter === 'all' ? 'bg-purple-600' : 'bg-white/10'}`}
-                >
-                  All
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                  className={`rounded-xl ${statusFilter === 'active' ? 'bg-green-600' : 'bg-white/10'}`}
-                >
-                  Active
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('inactive')}
-                  className={`rounded-xl ${statusFilter === 'inactive' ? 'bg-red-600' : 'bg-white/10'}`}
-                >
-                  Inactive
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setStatusFilter('pending')}
-                  className={`rounded-xl ${statusFilter === 'pending' ? 'bg-yellow-600' : 'bg-white/10'}`}
-                >
-                  Pending
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/20">
-                  <th className="text-gray-400 font-medium p-3">Student</th>
-                  <th className="text-gray-400 font-medium p-3">Course</th>
-                  <th className="text-gray-400 font-medium p-3">Instructor</th>
-                  <th className="text-gray-400 font-medium p-3">Status</th>
-                  <th className="text-gray-400 font-medium p-3">Assigned By</th>
-                  <th className="text-gray-400 font-medium p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEnrollments?.map((enrollment) => (
-                  <tr key={enrollment.enrollment_id} className="border-b border-white/10">
-                    <td className="p-3">
-                      <div>
-                        <p className="text-white font-medium">{enrollment.student_name}</p>
-                        <p className="text-gray-400 text-sm">{enrollment.student_number}</p>
-                        <p className="text-gray-400 text-sm">{enrollment.student_email}</p>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div>
-                        <p className="text-white font-medium">{enrollment.course_name}</p>
-                        <p className="text-gray-400 text-sm">{enrollment.course_code}</p>
-                      </div>
-                    </td>
-                    <td className="p-3 text-gray-300">{enrollment.instructor_name || 'Unassigned'}</td>
-                    <td className="p-3">{getStatusBadge(enrollment.enrollment_status)}</td>
-                    <td className="p-3 text-gray-300">{enrollment.assigned_by_name || 'System'}</td>
-                    <td className="p-3">
-                      <div className="flex space-x-2">
-                        {enrollment.enrollment_status === 'active' ? (
-                          <Button
-                            size="sm"
-                            onClick={() => updateEnrollmentStatus.mutate({ 
-                              enrollmentId: enrollment.enrollment_id, 
-                              status: 'inactive' 
-                            })}
-                            className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/30 rounded-xl px-3 py-1"
-                          >
-                            Deactivate
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => updateEnrollmentStatus.mutate({ 
-                              enrollmentId: enrollment.enrollment_id, 
-                              status: 'active' 
-                            })}
-                            className="bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/30 rounded-xl px-3 py-1"
-                          >
-                            Activate
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+        {filteredEnrollments && filteredEnrollments.length > 0 && (
+          <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
+            <h3 className="text-xl font-semibold text-white mb-4">Student Enrollments</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-white/20">
+                    <th className="text-gray-400 font-medium p-3">Student</th>
+                    <th className="text-gray-400 font-medium p-3">Course</th>
+                    <th className="text-gray-400 font-medium p-3">Status</th>
+                    <th className="text-gray-400 font-medium p-3">Enrollment Date</th>
+                    <th className="text-gray-400 font-medium p-3">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredEnrollments.map((enrollment) => (
+                    <tr key={enrollment.enrollment_id} className="border-b border-white/10 hover:bg-white/5">
+                      <td className="p-3">
+                        <div>
+                          <p className="text-white font-medium">{enrollment.student_name}</p>
+                          <p className="text-gray-400 text-sm">{enrollment.student_email}</p>
+                          <p className="text-gray-400 text-xs">{enrollment.student_number}</p>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div>
+                          <p className="text-white font-medium">{enrollment.course_name}</p>
+                          <p className="text-gray-400 text-sm">{enrollment.course_code}</p>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        {getStatusBadge(enrollment.enrollment_status)}
+                      </td>
+                      <td className="p-3 text-gray-300">
+                        {new Date(enrollment.enrollment_date).toLocaleDateString()}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // Handle status update
+                              const newStatus = enrollment.enrollment_status === 'active' ? 'inactive' : 'active';
+                              updateEnrollmentStatus.mutate({
+                                enrollmentId: enrollment.enrollment_id,
+                                status: newStatus
+                              });
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+                          >
+                            {enrollment.enrollment_status === 'active' ? 'Deactivate' : 'Activate'}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {/* Empty state for filtered results */}
+        {filteredEnrollments && filteredEnrollments.length === 0 && enrollments && enrollments.length > 0 && (
+          <div className="glass-card p-12 text-center">
+            <div className="mb-4">
+              <Search className="w-16 h-16 text-gray-400 mx-auto" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-2">No Results Found</h3>
+            <p className="text-gray-400">Try adjusting your search terms or filters.</p>
           </div>
-        </Card>
+        )}
 
         {/* Assignment Modal */}
         {showAssignmentModal && (
@@ -528,7 +659,7 @@ export const StudentCourseAssignment: React.FC = () => {
                 <Button
                   variant="ghost"
                   onClick={() => setShowAssignmentModal(false)}
-                  className="text-gray-400 hover:text-white"
+                  className="text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                 >
                   <XCircle className="w-5 h-5" />
                 </Button>
@@ -537,14 +668,14 @@ export const StudentCourseAssignment: React.FC = () => {
               <div className="flex mb-8 gap-2">
                 <Button
                   variant={assignmentTab === 'student' ? 'default' : 'outline'}
-                  className={`rounded-xl flex-1 ${assignmentTab === 'student' ? 'bg-purple-600 text-white' : ''}`}
+                  className={`rounded-xl flex-1 ${assignmentTab === 'student' ? 'bg-[#001F3F] text-white' : 'bg-white/10 text-white border-white/20'}`}
                   onClick={() => setAssignmentTab('student')}
                 >
                   <Users className="w-4 h-4 mr-2" /> Assign Student
                 </Button>
                 <Button
                   variant={assignmentTab === 'lecturer' ? 'default' : 'outline'}
-                  className={`rounded-xl flex-1 ${assignmentTab === 'lecturer' ? 'bg-blue-600 text-white' : ''}`}
+                  className={`rounded-xl flex-1 ${assignmentTab === 'lecturer' ? 'bg-[#001F3F] text-white' : 'bg-white/10 text-white border-white/20'}`}
                   onClick={() => setAssignmentTab('lecturer')}
                 >
                   <GraduationCap className="w-4 h-4 mr-2" /> Assign Lecturer
@@ -557,73 +688,91 @@ export const StudentCourseAssignment: React.FC = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-3">Search Student</label>
                     <Input
-                      placeholder="Search by name, email, or student number..."
+                      placeholder="Search students..."
                       value={studentSearch}
-                      onChange={e => setStudentSearch(e.target.value)}
-                      className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      className="mb-2 bg-white/10 border-white/20 text-white rounded-xl focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20"
                     />
-                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Student</label>
-                    <select
-                      value={selectedStudent?.id || ''}
-                      onChange={e => {
-                        const student = allStudents?.find(s => s.id === e.target.value);
-                        setSelectedStudent(student || null);
-                      }}
-                      className="custom-select"
-                    >
-                      <option value="">Select a student</option>
+                    <div className="max-h-40 overflow-y-auto space-y-2">
                       {filteredStudents?.map((student) => (
-                        <option key={student.id} value={student.id}>
-                          {student.full_name} ({student.student_number || student.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {/* Course Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-3">Select Courses</label>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {courses?.map((course) => (
-                        <label key={course.id} className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10">
-                          <input
-                            type="checkbox"
-                            checked={selectedCourses.includes(course.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCourses([...selectedCourses, course.id]);
-                              } else {
-                                setSelectedCourses(selectedCourses.filter(id => id !== course.id));
-                              }
-                            }}
-                            className="rounded border-white/20 bg-white/10 text-purple-600 focus:ring-purple-400"
-                          />
-                          <div className="flex-1">
-                            <p className="text-white font-medium">{course.name}</p>
-                            <p className="text-gray-400 text-sm">{course.code} - {course.department}</p>
-                            {course.users && (
-                              <p className="text-gray-400 text-sm">Instructor: {course.users.full_name}</p>
+                        <div
+                          key={student.id}
+                          onClick={() => setSelectedStudent(student)}
+                          className={`p-3 rounded-xl cursor-pointer transition-colors ${
+                            selectedStudent?.id === student.id
+                              ? 'bg-[#001F3F]/20 border border-[#001F3F]/30'
+                              : 'bg-white/5 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-white font-medium">{student.full_name}</p>
+                              <p className="text-gray-400 text-sm">{student.email}</p>
+                              {student.student_number && (
+                                <p className="text-gray-500 text-xs">ID: {student.student_number}</p>
+                              )}
+                            </div>
+                            {selectedStudent?.id === student.id && (
+                              <CheckCircle className="w-5 h-5 text-[#001F3F]" />
                             )}
                           </div>
-                        </label>
+                        </div>
                       ))}
                     </div>
                   </div>
-                  <div className="flex justify-end space-x-4 pt-6">
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowAssignmentModal(false)}
-                      className="text-gray-400 hover:text-white px-6 py-3 rounded-xl"
-                    >
-                      Cancel
-                    </Button>
+
+                  {/* Course Selection */}
+                  {selectedStudent && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-3">Select Courses</label>
+                      <div className="max-h-40 overflow-y-auto space-y-2">
+                        {courses?.map((course) => (
+                          <label
+                            key={course.id}
+                            className="flex items-center space-x-3 p-3 rounded-xl cursor-pointer bg-white/5 hover:bg-white/10 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedCourses.includes(course.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedCourses([...selectedCourses, course.id]);
+                                } else {
+                                  setSelectedCourses(selectedCourses.filter(id => id !== course.id));
+                                }
+                              }}
+                              className="rounded border-white/20 bg-white/10 text-[#001F3F] focus:ring-[#001F3F]"
+                            />
+                            <div>
+                              <p className="text-white font-medium">{course.name}</p>
+                              <p className="text-gray-400 text-sm">{course.code}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assign Button */}
+                  {selectedStudent && selectedCourses.length > 0 && (
                     <Button
                       onClick={handleAssignCourses}
-                      disabled={assignCourses.isPending || !selectedStudent || selectedCourses.length === 0}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg"
+                      disabled={assignCourses.isPending}
+                      className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg w-full"
                     >
-                      {assignCourses.isPending ? 'Assigning...' : 'Assign Courses'}
+                      {assignCourses.isPending ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Assigning...
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <UserPlus className="w-5 h-5 mr-2" />
+                          Assign {selectedCourses.length} Course{selectedCourses.length > 1 ? 's' : ''} to {selectedStudent.full_name}
+                        </div>
+                      )}
                     </Button>
-                  </div>
+                  )}
                 </div>
               )}
               {/* Lecturer Assignment Tab */}
@@ -675,7 +824,7 @@ export const StudentCourseAssignment: React.FC = () => {
                     <Button
                       variant="ghost"
                       onClick={() => setShowAssignmentModal(false)}
-                      className="text-gray-400 hover:text-white px-6 py-3 rounded-xl"
+                      className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 px-6 py-3 rounded-xl"
                     >
                       Cancel
                     </Button>

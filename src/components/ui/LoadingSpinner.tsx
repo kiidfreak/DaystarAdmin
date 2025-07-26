@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { TallyCheckLoader, TallyCheckLoaderAdvanced, TallyCheckSpinner } from './TallyCheckLoader';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -14,6 +15,11 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   text,
   className
 }) => {
+  // Use Tally Check loader for blue color, fallback to original for others
+  if (color === 'blue') {
+    return <TallyCheckLoader size={size} text={text} className={className} />;
+  }
+
   const sizeClasses = {
     sm: 'h-6 w-6',
     md: 'h-8 w-8',
@@ -23,7 +29,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   const colorClasses = {
     blue: 'border-sky-blue',
-    purple: 'border-purple-400',
+    purple: 'border-[#001F3F]',
     green: 'border-green-400',
     white: 'border-white'
   };
@@ -45,7 +51,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 // Full page loading component
 export const PageLoading: React.FC<{ text?: string }> = ({ text = 'Loading...' }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-center min-h-[400px]">
           <LoadingSpinner size="lg" color="purple" text={text} />
@@ -59,7 +65,7 @@ export const PageLoading: React.FC<{ text?: string }> = ({ text = 'Loading...' }
 export const CardLoading: React.FC<{ text?: string }> = ({ text = 'Loading...' }) => {
   return (
     <div className="glass-card p-12 text-center">
-      <LoadingSpinner size="lg" color="blue" text={text} />
+      <TallyCheckLoaderAdvanced size="lg" text={text} />
     </div>
   );
 };

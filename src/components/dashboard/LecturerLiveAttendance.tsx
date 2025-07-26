@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { 
   BookOpen, 
   Clock, 
@@ -26,12 +27,15 @@ import {
   CheckCircle2,
   XCircle,
   Clock3,
-  Download
+  Download,
+  Plus,
+  UserPlus
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { exportToPDF, formatAttendanceDataForExport } from '@/utils/pdfExport';
 import { PageLoading } from '@/components/ui/LoadingSpinner';
+import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/lib/supabase';
 
 type ClassSession = Database['public']['Tables']['class_sessions']['Row'] & {
@@ -67,6 +71,91 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showLiveAttendance, setShowLiveAttendance] = useState(false);
   const [attendanceMethodFilter, setAttendanceMethodFilter] = useState<'all' | 'ble' | 'qr'>('all');
+  const [showManualSignIn, setShowManualSignIn] = useState(false);
+  const [manualStudentSearch, setManualStudentSearch] = useState('');
+  const [selectedManualStudent, setSelectedManualStudent] = useState<any>(null);
+  const [selectedManualCourse, setSelectedManualCourse] = useState<string>('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Get all students for manual sign-in
+  const { data: allStudents, isLoading: studentsLoading } = useQuery({
+    queryKey: ['all-students'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, email, student_number, role')
+        .eq('role', 'student')
+        .order('full_name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Get all courses for manual sign-in
+  const { data: allCourses, isLoading: coursesLoading } = useQuery({
+    queryKey: ['all-courses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, name, code')
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Manual sign-in mutation
+  const manualSignInMutation = useMutation({
+    mutationFn: async ({ studentId, courseId }: { studentId: string; courseId: string }) => {
+      const course = allCourses?.find(c => c.id === courseId);
+      if (!course) throw new Error('Course not found');
+
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .insert({
+          student_id: studentId,
+          course_id: courseId,
+          course_code: course.code,
+          session_id: selectedSession?.id || null,
+          date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
+          status: 'verified',
+          method: 'MANUAL',
+          verified_by: lecturerId
+        });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Student Signed In Successfully",
+        description: "The student has been manually signed in to the attendance system.",
+      });
+      setShowManualSignIn(false);
+      setSelectedManualStudent(null);
+      setSelectedManualCourse('');
+      setManualStudentSearch('');
+      queryClient.invalidateQueries({ queryKey: ['live-attendance'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Sign-in Failed",
+        description: error.message || "Failed to sign in student. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filter students for manual sign-in
+  const filteredStudents = allStudents?.filter(student => 
+    student.full_name?.toLowerCase().includes(manualStudentSearch.toLowerCase()) ||
+    student.email?.toLowerCase().includes(manualStudentSearch.toLowerCase()) ||
+    student.student_number?.toLowerCase().includes(manualStudentSearch.toLowerCase())
+  ) || [];
 
   // Get lecturer's sessions from past week to next week
   const { data: sessions, isLoading: sessionsLoading } = useQuery({
@@ -246,7 +335,7 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
 
   const getFilterButtonClass = (filterValue: string) => {
     return statusFilter === filterValue 
-      ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+      ? 'bg-[#001F3F]/20 text-[#001F3F] border border-[#001F3F]/30' 
       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10';
   };
 
@@ -406,8 +495,8 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-4 mb-4">
-                        <div className="bg-purple-600/20 p-3 rounded-xl">
-                          <BookOpen className="w-6 h-6 text-purple-400" />
+                        <div className="bg-[#001F3F]/20 p-3 rounded-xl">
+                          <BookOpen className="w-6 h-6 text-[#001F3F]" />
                         </div>
                         <div>
                           <h4 className="text-xl font-semibold text-white mb-1">
@@ -629,7 +718,7 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                         setShowDetailsModal(false);
                         setShowLiveAttendance(true);
                       }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white"
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       View Live Attendance
@@ -761,7 +850,7 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                   <div className="max-h-96 overflow-y-auto">
                     {liveAttendanceLoading ? (
                       <div className="p-8 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400 mx-auto mb-4"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#001F3F] mx-auto mb-4"></div>
                         <p className="text-gray-400">Loading live attendance...</p>
                       </div>
                     ) : (() => {
@@ -772,8 +861,8 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                           <div key={record.id} className="p-4 hover:bg-white/5 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-4">
-                                <div className="w-10 h-10 bg-purple-600/20 rounded-full flex items-center justify-center">
-                                  <User className="w-5 h-5 text-purple-400" />
+                                <div className="w-10 h-10 bg-[#001F3F]/20 rounded-full flex items-center justify-center">
+                                  <User className="w-5 h-5 text-[#001F3F]" />
                                 </div>
                                 <div>
                                   <div className="text-white font-medium">
@@ -871,6 +960,13 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                   </div>
                   <div className="flex space-x-3">
                     <Button
+                      onClick={() => setShowManualSignIn(true)}
+                      className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white font-semibold"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Sign In Student
+                    </Button>
+                    <Button
                       variant="outline"
                       onClick={handleExportAttendance}
                       disabled={!liveAttendance || liveAttendance.length === 0}
@@ -891,13 +987,121 @@ export const LecturerLiveAttendance: React.FC<LecturerLiveAttendanceProps> = ({ 
                         setShowLiveAttendance(false);
                         setShowDetailsModal(true);
                       }}
-                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                      className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white"
                     >
                       <BookOpen className="w-4 h-4 mr-2" />
                       Back to Session Details
                     </Button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Sign-In Modal */}
+        {showManualSignIn && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99998] flex items-center justify-center p-4">
+            <div className="bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-white">Manual Sign-In</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowManualSignIn(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-6 h-6" />
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3 bg-white/5 rounded-xl p-3">
+                    <UserPlus className="w-5 h-5 text-[#001F3F]" />
+                    <Input
+                      placeholder="Search for student by name, email, or student number..."
+                      value={manualStudentSearch}
+                      onChange={(e) => setManualStudentSearch(e.target.value)}
+                      className="bg-transparent text-white focus:outline-none focus:ring-0 border-0"
+                    />
+                  </div>
+
+                  {studentsLoading ? (
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#001F3F] mx-auto mb-4"></div>
+                      <p className="text-gray-400">Loading students...</p>
+                    </div>
+                  ) : filteredStudents.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h4 className="text-lg font-semibold text-white mb-2">No students found</h4>
+                      <p className="text-gray-400">
+                        No students match your search criteria. Please try a different search term.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-white/10">
+                      {filteredStudents.map((student) => (
+                        <div
+                          key={student.id}
+                          className="p-3 hover:bg-white/5 cursor-pointer rounded-lg flex items-center justify-between"
+                          onClick={() => {
+                            setSelectedManualStudent(student);
+                            setShowManualSignIn(false);
+                          }}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <User className="w-5 h-5 text-[#001F3F]" />
+                            <div>
+                              <p className="text-white font-medium">{student.full_name}</p>
+                              <p className="text-gray-400 text-sm">{student.email}</p>
+                              <p className="text-gray-400 text-sm">Student ID: {student.student_number}</p>
+                            </div>
+                          </div>
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {selectedManualStudent && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                    <h4 className="text-lg font-semibold text-white mb-3">Select Course</h4>
+                    <div className="flex flex-wrap items-center space-x-2 space-y-2 bg-white/5 rounded-xl p-3">
+                      {allCourses?.map((course) => (
+                        <Badge
+                          key={course.id}
+                          variant={selectedManualCourse === course.id ? "default" : "outline"}
+                          className="cursor-pointer hover:bg-white/10"
+                          onClick={() => setSelectedManualCourse(course.id)}
+                        >
+                          {course.name} ({course.code})
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white"
+                        onClick={() => {
+                          if (selectedManualCourse) {
+                            manualSignInMutation.mutate({ studentId: selectedManualStudent.id, courseId: selectedManualCourse });
+                          } else {
+                            toast({
+                              title: "Error",
+                              description: "Please select a course for the student.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        disabled={!selectedManualCourse || manualSignInMutation.isLoading}
+                      >
+                        {manualSignInMutation.isLoading ? "Signing In..." : "Sign In Student"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
