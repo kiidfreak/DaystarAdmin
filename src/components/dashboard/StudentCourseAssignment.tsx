@@ -89,8 +89,7 @@ export const StudentCourseAssignment: React.FC = () => {
   
   const filteredStudents = allStudents?.filter(student =>
     student.full_name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    student.email.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    (student.student_number || '').toLowerCase().includes(studentSearch.toLowerCase())
+    student.email.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
   // Get all courses
@@ -123,8 +122,7 @@ export const StudentCourseAssignment: React.FC = () => {
             users!student_course_enrollments_student_id_fkey (
               id,
               full_name,
-              email,
-              student_number
+              email
             ),
             courses!student_course_enrollments_course_id_fkey (
               id,
@@ -144,7 +142,7 @@ export const StudentCourseAssignment: React.FC = () => {
           student_id: enrollment.student_id,
           student_name: enrollment.users?.full_name || 'Unknown',
           student_email: enrollment.users?.email || '',
-          student_number: enrollment.users?.student_number || '',
+          student_number: '', // student_number column doesn't exist in users table
           student_department: 'General',
           course_id: enrollment.course_id,
           course_name: enrollment.courses?.name || 'Unknown Course',
@@ -187,52 +185,6 @@ export const StudentCourseAssignment: React.FC = () => {
     },
     enabled: !!courses && !!enrollments, // Only run when courses and enrollments are loaded
   });
-
-  // Calculate statistics
-  const totalStudents = allStudents?.length || 0;
-  const activeEnrollments = enrollments?.filter(e => e.enrollment_status === 'active').length || 0;
-  const pendingEnrollments = enrollments?.filter(e => e.enrollment_status === 'pending').length || 0;
-  const totalCourses = courses?.length || 0;
-
-  // Show loading state while data is being fetched
-  if (studentsLoading || coursesLoading || enrollmentsLoading || statsLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
-          <div className="glass-card p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h2 className="text-2xl font-bold text-white mb-2">Loading Course Assignment Data</h2>
-            <p className="text-gray-400">Please wait while we fetch the latest information...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if there are issues
-  const hasError = !allStudents || !courses || !enrollments;
-  if (hasError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
-          <div className="glass-card p-12 text-center">
-            <div className="mb-4">
-              <AlertCircle className="w-16 h-16 text-red-400 mx-auto" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Course Assignment Dashboard</h2>
-            <p className="text-gray-400 mb-6">Welcome to the Course Assignment page. You can manage student course enrollments here.</p>
-            <Button
-              onClick={() => setShowAssignmentModal(true)}
-              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Start Assigning Courses
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Assign courses to student
   const assignCourses = useMutation({
@@ -386,11 +338,56 @@ export const StudentCourseAssignment: React.FC = () => {
 
   const filteredEnrollments = enrollments?.filter(enrollment => {
     const matchesSearch = enrollment.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         enrollment.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         enrollment.student_number.toLowerCase().includes(searchTerm.toLowerCase());
+                         enrollment.course_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || enrollment.enrollment_status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Calculate statistics
+  const totalStudents = allStudents?.length || 0;
+  const activeEnrollments = enrollments?.filter(e => e.enrollment_status === 'active').length || 0;
+  const pendingEnrollments = enrollments?.filter(e => e.enrollment_status === 'pending').length || 0;
+  const totalCourses = courses?.length || 0;
+
+  // Show loading state while data is being fetched
+  if (studentsLoading || coursesLoading || enrollmentsLoading || statsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="glass-card p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading Course Assignment Data</h2>
+            <p className="text-gray-400">Please wait while we fetch the latest information...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if there are issues
+  const hasError = !allStudents || !courses || !enrollments;
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="glass-card p-12 text-center">
+            <div className="mb-4">
+              <AlertCircle className="w-16 h-16 text-red-400 mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Course Assignment Dashboard</h2>
+            <p className="text-gray-400 mb-6">Welcome to the Course Assignment page. You can manage student course enrollments here.</p>
+            <Button
+              onClick={() => setShowAssignmentModal(true)}
+              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Start Assigning Courses
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#001F3F] to-slate-900 p-8">
@@ -594,7 +591,7 @@ export const StudentCourseAssignment: React.FC = () => {
                         <div>
                           <p className="text-white font-medium">{enrollment.student_name}</p>
                           <p className="text-gray-400 text-sm">{enrollment.student_email}</p>
-                          <p className="text-gray-400 text-xs">{enrollment.student_number}</p>
+                          <p className="text-gray-400 text-xs">Student ID: {enrollment.student_id}</p>
                         </div>
                       </td>
                       <td className="p-3">
@@ -708,9 +705,7 @@ export const StudentCourseAssignment: React.FC = () => {
                             <div>
                               <p className="text-white font-medium">{student.full_name}</p>
                               <p className="text-gray-400 text-sm">{student.email}</p>
-                              {student.student_number && (
-                                <p className="text-gray-500 text-xs">ID: {student.student_number}</p>
-                              )}
+                                            <p className="text-gray-500 text-xs">ID: {student.id}</p>
                             </div>
                             {selectedStudent?.id === student.id && (
                               <CheckCircle className="w-5 h-5 text-[#001F3F]" />

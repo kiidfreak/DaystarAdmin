@@ -191,7 +191,7 @@ export const TallyCheckLoaderAdvanced: React.FC<TallyCheckLoaderProps> = ({
         </div>
       )}
       
-      <style jsx>{`
+      <style>{`
         @keyframes slideInHorizontal {
           0%, 100% { transform: translate(-50%, -50%) scaleX(0); opacity: 0; }
           50% { transform: translate(-50%, -50%) scaleX(1); opacity: 1; }
