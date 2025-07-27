@@ -8,8 +8,8 @@
 @layer base {
   :root {
     /* Tally Check Navy Blue & White Color Palette */
-    --background: 220 25% 8%; /* #001F3F - Deep Navy */
-    --foreground: 0 0% 100%; /* #FFFFFF - White */
+    --background: 0 0% 100%; /* #FFFFFF - White */
+    --foreground: 0 0% 10%; /* #1A1A1A - Dark Text */
     --card: 0 0% 100%; /* #FFFFFF - White */
     --card-foreground: 0 0% 10%; /* #1A1A1A - Dark Text */
     --popover: 0 0% 100%; /* #FFFFFF - White */
@@ -44,7 +44,7 @@
   }
 
   body {
-    @apply text-foreground min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F];
+    @apply text-foreground min-h-screen bg-white;
     font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
     scroll-behavior: smooth;
   }
