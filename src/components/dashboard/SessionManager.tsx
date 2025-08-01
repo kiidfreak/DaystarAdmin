@@ -55,11 +55,11 @@ export const SessionManager: React.FC = () => {
   const [formData, setFormData] = useState<SessionFormData>({
     course_id: '',
     session_date: new Date().toISOString().split('T')[0],
-    start_time: '09:00',
-    end_time: '10:30',
+    start_time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+    end_time: new Date(Date.now() + 90 * 60 * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
     location: '',
-    attendance_window_start: '08:45',
-    attendance_window_end: '09:15'
+    attendance_window_start: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }), // Start immediately
+    attendance_window_end: new Date(Date.now() + 90 * 60 * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) // End when session ends
   });
   const [highlightedSessionId, setHighlightedSessionId] = useState<string | null>(null);
   const [sessionSearch, setSessionSearch] = useState('');
@@ -169,13 +169,9 @@ export const SessionManager: React.FC = () => {
       const startTime = sessionData.start_time.length === 5 ? sessionData.start_time + ':00' : sessionData.start_time;
       const endTime = sessionData.end_time.length === 5 ? sessionData.end_time + ':00' : sessionData.end_time;
       
-      // Format attendance window times as full timestamps
-      const attendanceWindowStart = sessionData.attendance_window_start
-        ? `${sessionDate} ${sessionData.attendance_window_start.length === 5 ? sessionData.attendance_window_start + ':00' : sessionData.attendance_window_start}`
-        : null;
-      const attendanceWindowEnd = sessionData.attendance_window_end
-        ? `${sessionDate} ${sessionData.attendance_window_end.length === 5 ? sessionData.attendance_window_end + ':00' : sessionData.attendance_window_end}`
-        : null;
+      // Set attendance window to start immediately when session starts and end when session ends
+      const attendanceWindowStart = `${sessionDate} ${startTime}`;
+      const attendanceWindowEnd = `${sessionDate} ${endTime}`;
       
       const formattedData = {
         course_id: sessionData.course_id,
@@ -238,11 +234,11 @@ export const SessionManager: React.FC = () => {
       setFormData({
         course_id: '',
         session_date: new Date().toISOString().split('T')[0],
-        start_time: '09:00',
-        end_time: '10:30',
+        start_time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+        end_time: new Date(Date.now() + 90 * 60 * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
         location: '',
-        attendance_window_start: '08:45',
-        attendance_window_end: '09:15'
+        attendance_window_start: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }), // Start immediately
+        attendance_window_end: new Date(Date.now() + 90 * 60 * 1000).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) // End when session ends
       });
       setHighlightedSessionId(data?.id || null);
       
@@ -260,8 +256,8 @@ export const SessionManager: React.FC = () => {
       console.log('Session course_id matches lecturer courses:', courses?.some(c => c.id === data?.course_id));
       
       toast({
-        title: "Session Created",
-        description: "Class session has been created successfully",
+        title: "✅ Session Created Successfully",
+        description: "Your session is now active immediately! Students can check in right away.",
       });
     },
     onError: (error) => {
@@ -560,7 +556,7 @@ export const SessionManager: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -569,10 +565,10 @@ export const SessionManager: React.FC = () => {
             <p className="text-gray-400">Create and manage your class sessions</p>
           </div>
           <div className="flex items-center">
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg mr-2"
-            >
+                         <Button
+               onClick={() => setShowCreateForm(true)}
+               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg mr-2"
+             >
               <Plus className="w-5 h-5 mr-2" />
               Create Session
             </Button>
@@ -591,9 +587,16 @@ export const SessionManager: React.FC = () => {
         {(showCreateForm || editingSession) && (
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-xl">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-white">
-                {editingSession ? 'Edit Session' : 'Create New Session'}
-              </h3>
+              <div>
+                <h3 className="text-xl font-semibold text-white">
+                  {editingSession ? 'Edit Session' : 'Create New Session'}
+                </h3>
+                {!editingSession && (
+                  <p className="text-sm text-green-400 mt-1">
+                    ⚡ Sessions start immediately when created - students can check in right away!
+                  </p>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -613,90 +616,90 @@ export const SessionManager: React.FC = () => {
                   <select
                     value={formData.course_id}
                     onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  >
-                    <option value="">Select a course</option>
-                    {courses?.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name} ({course.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                                         className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   >
+                     <option value="">Select a course</option>
+                     {courses?.map((course) => (
+                       <option key={course.id} value={course.id}>
+                         {course.name} ({course.code})
+                       </option>
+                     ))}
+                   </select>
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Date</label>
-                  <Input
-                    type="date"
-                    value={formData.session_date}
-                    onChange={(e) => setFormData({ ...formData, session_date: e.target.value })}
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Date</label>
+                   <Input
+                     type="date"
+                     value={formData.session_date}
+                     onChange={(e) => setFormData({ ...formData, session_date: e.target.value })}
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Start Time</label>
-                  <Input
-                    type="time"
-                    value={formData.start_time}
-                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Start Time</label>
+                   <Input
+                     type="time"
+                     value={formData.start_time}
+                     onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">End Time</label>
-                  <Input
-                    type="time"
-                    value={formData.end_time}
-                    onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">End Time</label>
+                   <Input
+                     type="time"
+                     value={formData.end_time}
+                     onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Location</label>
-                  <Input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="Room 101, Building A"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Location</label>
+                   <Input
+                     type="text"
+                     value={formData.location}
+                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                     placeholder="Room 101, Building A"
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Attendance Window Start</label>
-                  <Input
-                    type="time"
-                    value={formData.attendance_window_start}
-                    onChange={(e) => setFormData({ ...formData, attendance_window_start: e.target.value })}
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Attendance Window Start</label>
+                   <Input
+                     type="time"
+                     value={formData.attendance_window_start}
+                     onChange={(e) => setFormData({ ...formData, attendance_window_start: e.target.value })}
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Attendance Window End</label>
-                  <Input
-                    type="time"
-                    value={formData.attendance_window_end}
-                    onChange={(e) => setFormData({ ...formData, attendance_window_end: e.target.value })}
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Attendance Window End</label>
+                   <Input
+                     type="time"
+                     value={formData.attendance_window_end}
+                     onChange={(e) => setFormData({ ...formData, attendance_window_end: e.target.value })}
+                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-3">Beacon (Optional)</label>
-                  <select
-                    value={formData.beacon_id || ''}
-                    onChange={(e) => setFormData({ ...formData, beacon_id: e.target.value || undefined })}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                 <div>
+                   <label className="block text-sm font-medium text-gray-300 mb-3">Beacon (Optional)</label>
+                   <select
+                     value={formData.beacon_id || ''}
+                     onChange={(e) => setFormData({ ...formData, beacon_id: e.target.value || undefined })}
+                     className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   >
                     <option value="">Auto-assign from course</option>
                     {beaconAssignments?.map((assignment) => (
@@ -720,11 +723,11 @@ export const SessionManager: React.FC = () => {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={createSession.isPending || updateSession.isPending}
-                  className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
-                >
+                                 <Button
+                   type="submit"
+                   disabled={createSession.isPending || updateSession.isPending}
+                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg"
+                 >
                   {createSession.isPending || updateSession.isPending ? 'Saving...' : (editingSession ? 'Update Session' : 'Create Session')}
                 </Button>
               </div>
@@ -737,20 +740,20 @@ export const SessionManager: React.FC = () => {
           {/* Add search/filter bar above the sessions list */}
           <div className="flex flex-col md:flex-row md:items-center md:space-x-4 mb-6">
             <div className="flex-1 mb-2 md:mb-0">
-              <Input
-                placeholder="Search by course name or code..."
-                value={sessionSearch}
-                onChange={e => setSessionSearch(e.target.value)}
-                className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-              />
+                             <Input
+                 placeholder="Search by course name or code..."
+                 value={sessionSearch}
+                 onChange={e => setSessionSearch(e.target.value)}
+                 className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+               />
             </div>
             <div className="flex space-x-2">
-              <Input
-                type="date"
-                value={sessionDateFilter}
-                onChange={e => setSessionDateFilter(e.target.value)}
-                className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
-              />
+                             <Input
+                 type="date"
+                 value={sessionDateFilter}
+                 onChange={e => setSessionDateFilter(e.target.value)}
+                 className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+               />
               <Button
                 onClick={() => {
                   queryClient.invalidateQueries({ queryKey: ['lecturer-sessions'] });
@@ -768,10 +771,10 @@ export const SessionManager: React.FC = () => {
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-6" />
               <h4 className="text-xl font-semibold text-white mb-2">No sessions found</h4>
               <p className="text-gray-400 mb-6">Try adjusting your search or filters.</p>
-              <Button
-                onClick={() => setShowCreateForm(true)}
-                className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl"
-              >
+                             <Button
+                 onClick={() => setShowCreateForm(true)}
+                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl"
+               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Session
               </Button>

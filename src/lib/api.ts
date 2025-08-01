@@ -500,7 +500,6 @@ export const beaconApi = {
   async getActiveSessionsForBeacon(macAddress: string, userId: string): Promise<any[]> {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
-    const currentTime = now.toTimeString().split(' ')[0];
     
     // Get beacon by MAC address
     const { data: beacon, error: beaconError } = await supabase
@@ -515,7 +514,7 @@ export const beaconApi = {
       return [];
     }
     
-    // Get active sessions for this beacon
+    // Get any sessions for this beacon on today's date (no time restrictions)
     const { data: sessions, error: sessionsError } = await supabase
       .from('class_sessions')
       .select(`
@@ -534,16 +533,15 @@ export const beaconApi = {
       `)
       .eq('beacon_id', beacon.id)
       .eq('session_date', today)
-      .lte('start_time', currentTime)
-      .gte('end_time', currentTime)
-      .order('start_time');
+      .order('start_time', { ascending: false })
+      .limit(1);
     
     if (sessionsError) {
       console.log('BLE DEBUG: Error fetching sessions:', sessionsError);
       return [];
     }
     
-    console.log('BLE DEBUG: Active sessions found for beacon:', sessions?.length || 0);
+    console.log('BLE DEBUG: Sessions found for beacon:', sessions?.length || 0);
     return sessions || [];
   },
 

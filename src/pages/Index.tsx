@@ -116,7 +116,7 @@ const Index = () => {
       sessions: 'Session Manager',
       beacons: 'BLE Beacon Manager',
       reports: userRole === 'student' ? 'My Reports' : 'Attendance Reports',
-      analytics: 'System Analytics',
+
       students: 'All Students',
       users: 'User Management',
       'course-assignments': 'Course Assignments',
@@ -179,9 +179,9 @@ const Index = () => {
               <>
                 {/* Welcome Message for Lecturers */}
                 {userRole === 'lecturer' && (
-                  <div className="professional-card p-8 mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200">
+                  <div className="professional-card p-8 mb-8 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 border-2 border-blue-200 shadow-lg">
                     <div className="flex items-center space-x-6">
-                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center shadow-xl">
                         <User className="w-10 h-10 text-white" />
                       </div>
                       <div className="flex-1">
@@ -192,11 +192,11 @@ const Index = () => {
                           Ready to inspire your students today? Let's make learning amazing! 🌟
                         </p>
                         <div className="mt-4 flex items-center space-x-4">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
                             Active Session
                           </span>
-                          <span className="text-gray-500 text-sm">
+                          <span className="text-gray-500 text-sm font-medium">
                             {new Date().toLocaleDateString('en-US', { 
                               weekday: 'long', 
                               year: 'numeric', 
@@ -209,6 +209,40 @@ const Index = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Welcome Message for Admin */}
+                {userRole === 'admin' && (
+                  <div className="professional-card p-8 mb-8 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-100 border-2 border-blue-200 shadow-lg">
+                    <div className="flex items-center space-x-6">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center shadow-xl">
+                        <User className="w-10 h-10 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                          Welcome back, {user?.full_name}! 👋
+                        </h2>
+                        <p className="text-gray-700 text-lg font-medium leading-relaxed">
+                          Ready to manage the attendance system? Let's ensure everything runs smoothly! 🚀
+                        </p>
+                        <div className="mt-4 flex items-center space-x-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                            System Active
+                          </span>
+                          <span className="text-gray-500 text-sm font-medium">
+                            {new Date().toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div onClick={() => handleMetricCardClick('all')} className="cursor-pointer">
                     <MetricCard 

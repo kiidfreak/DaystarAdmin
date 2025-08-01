@@ -146,7 +146,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
           label: 'Analytics',
           icon: BarChart3,
           items: [
-            { id: 'analytics', label: 'Analytics', icon: Monitor },
             { id: 'attendance-analytics', label: 'Attendance Analytics', icon: BarChart3 },
             { id: 'admin-reports', label: 'Admin Reports', icon: Activity },
           ]

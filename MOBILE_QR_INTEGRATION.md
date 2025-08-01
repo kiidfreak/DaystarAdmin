@@ -142,26 +142,20 @@ export class QRCodeService {
         throw new Error('Student not enrolled in this course');
       }
 
-      // Find active session for the course
+      // Find any session for the course on today's date (no time restrictions)
       const today = new Date().toISOString().split('T')[0];
-      const currentTime = new Date().toLocaleTimeString('en-US', { 
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
 
       const { data: session, error: sessionError } = await supabase
         .from('class_sessions')
         .select('*')
         .eq('course_id', qrCode.course_id)
         .eq('session_date', today)
-        .gte('start_time', currentTime)
-        .lte('end_time', currentTime)
+        .order('start_time', { ascending: false })
+        .limit(1)
         .single();
 
       if (sessionError || !session) {
-        throw new Error('No active session found for this course');
+        throw new Error('No session found for this course today');
       }
 
       // Create attendance record

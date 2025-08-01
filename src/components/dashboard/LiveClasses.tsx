@@ -240,7 +240,7 @@ export const LiveClasses: React.FC = () => {
 
   const getFilterButtonClass = (filterValue: string) => {
     return statusFilter === filterValue 
-      ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' 
+      ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' 
       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10';
   };
 
@@ -286,7 +286,7 @@ export const LiveClasses: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -312,7 +312,7 @@ export const LiveClasses: React.FC = () => {
                 placeholder="Search classes by course, instructor, or location..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                className="w-full pl-10 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
               />
             </div>
             <Button

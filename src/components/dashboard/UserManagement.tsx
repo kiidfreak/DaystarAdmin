@@ -442,7 +442,7 @@ export const UserManagement: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -468,10 +468,10 @@ export const UserManagement: React.FC = () => {
                 Create Admin Account
               </Button>
             )}
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
-            >
+                         <Button
+               onClick={() => setShowCreateForm(true)}
+               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg"
+             >
               <UserPlus className="w-5 h-5 mr-2" />
               Add User
             </Button>
@@ -582,7 +582,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="john.smith@university.edu"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                     required
                   />
                 </div>
@@ -594,7 +594,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Enter password for login"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                     required={!editingUser}
                   />
                   {!editingUser && (
@@ -609,7 +609,7 @@ export const UserManagement: React.FC = () => {
                   <select
                     value={formData.role}
                     onChange={(e) => setFormData({ ...formData, role: e.target.value as 'lecturer' | 'student' | 'admin' })}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                     required
                   >
                     <option value="lecturer">Lecturer</option>
@@ -625,7 +625,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     placeholder="Computer Science"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   />
                 </div>
 
@@ -636,7 +636,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+1 (555) 123-4567"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   />
                 </div>
 
@@ -647,7 +647,7 @@ export const UserManagement: React.FC = () => {
                     value={formData.office_location}
                     onChange={(e) => setFormData({ ...formData, office_location: e.target.value })}
                     placeholder="Building A, Room 205"
-                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   />
                 </div>
               </div>
@@ -667,7 +667,7 @@ export const UserManagement: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={createUser.isPending || updateUser.isPending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg w-full sm:w-auto"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg w-full sm:w-auto"
                 >
                   {createUser.isPending || updateUser.isPending ? 'Saving...' : (editingUser ? 'Update User' : 'Create User')}
                 </Button>
@@ -708,7 +708,7 @@ export const UserManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-3">Course</label>
                 <select
                   name="course_id"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   required
                 >
                   <option value="">Select a course</option>
@@ -723,7 +723,7 @@ export const UserManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-300 mb-3">Lecturer</label>
                 <select
                   name="instructor_id"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                   required={!selectedUser}
                   defaultValue={selectedUser?.id || ''}
                 >
@@ -750,7 +750,7 @@ export const UserManagement: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={assignCourse.isPending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl shadow-lg w-full sm:w-auto"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg w-full sm:w-auto"
                 >
                   {assignCourse.isPending ? 'Assigning...' : 'Assign Course'}
                 </Button>
@@ -776,7 +776,7 @@ export const UserManagement: React.FC = () => {
                 <p className="text-gray-400 mb-6">Add courses first to manage assignments</p>
                 <Button
                   onClick={() => setShowCreateForm(true)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Add Course
@@ -789,8 +789,8 @@ export const UserManagement: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-4 mb-4">
-                          <div className="bg-purple-600/20 p-3 rounded-xl">
-                            <BookOpen className="w-6 h-6 text-purple-400" />
+                          <div className="bg-blue-600/20 p-3 rounded-xl">
+                            <BookOpen className="w-6 h-6 text-blue-400" />
                           </div>
                           <div>
                             <h4 className="text-xl font-semibold text-white mb-1">

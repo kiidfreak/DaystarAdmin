@@ -53,6 +53,10 @@ interface DeviceVerificationRequest {
   reason?: string;
   device_type?: string;
   location?: string;
+  student_phone?: string;
+  verification_method?: 'in_person' | 'video_call' | 'document';
+  admin_notes?: string;
+  verification_date?: string;
 }
 
 interface DeviceStats {
@@ -77,59 +81,89 @@ export const DeviceVerification: React.FC = () => {
   const { toast } = useToast();
   const { isConnected } = useRealtimeAttendance();
 
-  // Mock data for demonstration (since the database table might not exist)
+  // Mock data for student phone change verification requests
   const mockRequests: DeviceVerificationRequest[] = [
     {
       id: '1',
       student_id: 'STU001',
       student_name: 'John Doe',
       student_email: 'john.doe@student.edu',
-      old_device_id: 'DEV-OLD-123456',
-      new_device_id: 'DEV-NEW-789012',
+      student_phone: '+254 700 123 456',
+      old_device_id: 'iPhone-13-123456',
+      new_device_id: 'iPhone-15-789012',
       request_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'pending',
-      reason: 'Phone was stolen, need to use new device',
+      reason: 'Phone was stolen during commute, need to use new device for attendance',
       device_type: 'Smartphone',
-      location: 'Campus Library'
+      location: 'Admin Office',
+      verification_method: 'in_person',
+      admin_notes: 'Student provided police report for stolen phone'
     },
     {
       id: '2',
       student_id: 'STU002',
       student_name: 'Jane Smith',
       student_email: 'jane.smith@student.edu',
-      old_device_id: 'DEV-OLD-654321',
-      new_device_id: 'DEV-NEW-345678',
+      student_phone: '+254 700 234 567',
+      old_device_id: 'Samsung-Galaxy-654321',
+      new_device_id: 'iPhone-14-345678',
       request_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'approved',
-      reason: 'Device malfunction, replaced with new phone',
+      reason: 'Old phone battery died completely, upgraded to new phone',
       device_type: 'Smartphone',
-      location: 'Computer Lab'
+      location: 'Computer Lab',
+      verification_method: 'in_person',
+      verification_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      admin_notes: 'Verified student identity and new device. Device change approved.'
     },
     {
       id: '3',
       student_id: 'STU003',
       student_name: 'Mike Johnson',
       student_email: 'mike.johnson@student.edu',
-      old_device_id: 'DEV-OLD-111222',
-      new_device_id: 'DEV-NEW-333444',
+      student_phone: '+254 700 345 678',
+      old_device_id: 'Huawei-P30-111222',
+      new_device_id: 'Samsung-S24-333444',
       request_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
       status: 'rejected',
-      reason: 'Suspicious activity detected',
-      device_type: 'Tablet',
-      location: 'Student Center'
+      reason: 'Upgraded to new phone model',
+      device_type: 'Smartphone',
+      location: 'Student Center',
+      verification_method: 'in_person',
+      admin_notes: 'Student could not provide sufficient proof of device ownership'
     },
     {
       id: '4',
       student_id: 'STU004',
       student_name: 'Sarah Wilson',
       student_email: 'sarah.wilson@student.edu',
-      old_device_id: 'DEV-OLD-555666',
-      new_device_id: 'DEV-NEW-777888',
+      student_phone: '+254 700 456 789',
+      old_device_id: 'iPhone-12-555666',
+      new_device_id: 'iPhone-15-Pro-777888',
       request_date: new Date().toISOString(),
       status: 'pending',
-      reason: 'Upgraded to new phone model',
+      reason: 'Phone screen cracked, replaced with new device',
       device_type: 'Smartphone',
-      location: 'Lecture Hall A'
+      location: 'Admin Office',
+      verification_method: 'in_person',
+      admin_notes: 'Awaiting student to bring new device for verification'
+    },
+    {
+      id: '5',
+      student_id: 'STU005',
+      student_name: 'David Kimani',
+      student_email: 'david.kimani@student.edu',
+      student_phone: '+254 700 567 890',
+      old_device_id: 'Tecno-Camon-999888',
+      new_device_id: 'iPhone-13-111222',
+      request_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'approved',
+      reason: 'Lost phone during sports event, family provided new device',
+      device_type: 'Smartphone',
+      location: 'Admin Office',
+      verification_method: 'in_person',
+      verification_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      admin_notes: 'Parent accompanied student. Device change verified and approved.'
     }
   ];
 
@@ -303,9 +337,9 @@ export const DeviceVerification: React.FC = () => {
       <div className="professional-card p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">🔐 Device Verification Center</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">📱 Student Phone Change Verification</h2>
             <p className="text-gray-600 text-lg">
-              Manage student device change requests and ensure secure device transitions
+              Verify students who need to change their phones for attendance system access
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -332,9 +366,9 @@ export const DeviceVerification: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-blue-900">{stats.total}</div>
-                <div className="text-sm text-blue-600">Total Requests</div>
+                <div className="text-sm text-blue-600">Phone Change Requests</div>
               </div>
-              <Shield className="w-8 h-8 text-blue-600" />
+              <PhoneIcon className="w-8 h-8 text-blue-600" />
             </div>
           </div>
           
@@ -342,7 +376,7 @@ export const DeviceVerification: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-yellow-900">{stats.pending}</div>
-                <div className="text-sm text-yellow-600">Pending</div>
+                <div className="text-sm text-yellow-600">Awaiting Verification</div>
               </div>
               <ClockIcon className="w-8 h-8 text-yellow-600" />
             </div>
@@ -352,7 +386,7 @@ export const DeviceVerification: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-green-900">{stats.approved}</div>
-                <div className="text-sm text-green-600">Approved</div>
+                <div className="text-sm text-green-600">Verified & Approved</div>
               </div>
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
@@ -362,7 +396,7 @@ export const DeviceVerification: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-2xl font-bold text-red-900">{stats.rejected}</div>
-                <div className="text-sm text-red-600">Rejected</div>
+                <div className="text-sm text-red-600">Verification Failed</div>
               </div>
               <XCircle className="w-8 h-8 text-red-600" />
             </div>
@@ -435,8 +469,8 @@ export const DeviceVerification: React.FC = () => {
       <div className="professional-card p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">📱 Device Change Requests</h3>
-            <p className="text-gray-600">Review and manage student device verification requests</p>
+            <h3 className="text-xl font-semibold text-gray-900">📱 Student Phone Change Requests</h3>
+            <p className="text-gray-600">Review and verify students who need to change their phones for attendance</p>
           </div>
           <Badge variant="outline" className="text-sm">
             {filteredRequests.length} requests
@@ -448,8 +482,8 @@ export const DeviceVerification: React.FC = () => {
             <TableHeader>
               <TableRow className="bg-gray-50">
                 <TableHead className="text-gray-700 font-semibold">👤 Student</TableHead>
-                <TableHead className="text-gray-700 font-semibold">📱 Old Device</TableHead>
-                <TableHead className="text-gray-700 font-semibold">📱 New Device</TableHead>
+                <TableHead className="text-gray-700 font-semibold">📱 Old Phone</TableHead>
+                <TableHead className="text-gray-700 font-semibold">📱 New Phone</TableHead>
                 <TableHead className="text-gray-700 font-semibold">📅 Request Date</TableHead>
                 <TableHead className="text-gray-700 font-semibold">📊 Status</TableHead>
                 <TableHead className="text-gray-700 font-semibold">⚡ Actions</TableHead>
@@ -517,7 +551,7 @@ export const DeviceVerification: React.FC = () => {
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle className="text-xl font-bold text-gray-900">
-                                📱 Device Change Details
+                                📱 Phone Change Verification Details
                               </DialogTitle>
                             </DialogHeader>
                             <div className="space-y-6">
@@ -547,38 +581,68 @@ export const DeviceVerification: React.FC = () => {
                                 </div>
                               </div>
 
-                              {/* Device Information */}
+                              {/* Phone Information */}
                               <div className="bg-green-50 rounded-lg p-4">
                                 <h4 className="font-semibold text-green-900 mb-3 flex items-center">
-                                  <Smartphone className="w-4 h-4 mr-2" />
-                                  Device Information
+                                  <PhoneIcon className="w-4 h-4 mr-2" />
+                                  Phone Information
                                 </h4>
                                 <div className="space-y-3">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-gray-600">Device Type:</span>
+                                    <span className="text-gray-600">Phone Type:</span>
                                     <div className="flex items-center space-x-2">
                                       {getDeviceIcon(request.device_type)}
                                       <span className="font-medium text-gray-900">{request.device_type}</span>
                                     </div>
                                   </div>
+                                  {request.student_phone && (
+                                    <div>
+                                      <span className="text-gray-600">Student Phone:</span>
+                                      <p className="mt-1 font-medium text-gray-900">{request.student_phone}</p>
+                                    </div>
+                                  )}
                                   <div>
-                                    <span className="text-gray-600">Old Device ID:</span>
+                                    <span className="text-gray-600">Old Phone ID:</span>
                                     <code className="block mt-1 bg-gray-100 px-2 py-1 rounded text-gray-700 border">
                                       {request.old_device_id}
                                     </code>
                                   </div>
                                   <div>
-                                    <span className="text-gray-600">New Device ID:</span>
+                                    <span className="text-gray-600">New Phone ID:</span>
                                     <code className="block mt-1 bg-green-100 px-2 py-1 rounded text-green-700 border border-green-200">
                                       {request.new_device_id}
                                     </code>
                                   </div>
                                   <div>
-                                    <span className="text-gray-600">Reason:</span>
+                                    <span className="text-gray-600">Change Reason:</span>
                                     <p className="mt-1 text-gray-900">{request.reason || 'No reason provided'}</p>
                                   </div>
+                                  {request.verification_method && (
+                                    <div>
+                                      <span className="text-gray-600">Verification Method:</span>
+                                      <p className="mt-1 font-medium text-gray-900 capitalize">
+                                        {request.verification_method.replace('_', ' ')}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
+
+                              {/* Admin Notes */}
+                              {request.admin_notes && (
+                                <div className="bg-yellow-50 rounded-lg p-4">
+                                  <h4 className="font-semibold text-yellow-900 mb-3 flex items-center">
+                                    <Bell className="w-4 h-4 mr-2" />
+                                    Admin Notes
+                                  </h4>
+                                  <p className="text-gray-900">{request.admin_notes}</p>
+                                  {request.verification_date && (
+                                    <p className="text-sm text-gray-600 mt-2">
+                                      Verified on: {new Date(request.verification_date).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
 
                               {/* Action Buttons */}
                               {request.status === 'pending' && (
@@ -596,7 +660,7 @@ export const DeviceVerification: React.FC = () => {
                                     ) : (
                                       <Check className="w-4 h-4 mr-2" />
                                     )}
-                                    Approve Device
+                                    Approve Phone Change
                                   </Button>
                                   <Button
                                     onClick={() => {
@@ -652,10 +716,10 @@ export const DeviceVerification: React.FC = () => {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12">
                     <div className="text-center">
-                      <Smartphone className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Device Requests</h3>
+                      <PhoneIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Phone Change Requests</h3>
                       <p className="text-gray-600">
-                        {searchTerm ? 'No requests match your search criteria' : 'All device verification requests have been processed!'}
+                        {searchTerm ? 'No requests match your search criteria' : 'All phone change verification requests have been processed!'}
                       </p>
                     </div>
                   </TableCell>
@@ -671,12 +735,12 @@ export const DeviceVerification: React.FC = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-gray-900">
-              ❌ Reject Device Request
+              ❌ Reject Phone Change Request
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-gray-600">
-              Please provide a reason for rejecting this device change request:
+              Please provide a reason for rejecting this phone change request:
             </p>
             <Textarea
               placeholder="Enter rejection reason..."

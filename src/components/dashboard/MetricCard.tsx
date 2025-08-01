@@ -20,10 +20,10 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   color = 'blue'
 }) => {
   const colorClasses = {
-    blue: 'text-blue-600 bg-blue-100 border-blue-200',
-    green: 'text-green-600 bg-green-100 border-green-200',
-    yellow: 'text-yellow-600 bg-yellow-100 border-yellow-200',
-    red: 'text-red-600 bg-red-100 border-red-200'
+    blue: 'text-blue-600 bg-blue-50 border-blue-200 shadow-sm',
+    green: 'text-green-600 bg-green-50 border-green-200 shadow-sm',
+    yellow: 'text-yellow-600 bg-yellow-50 border-yellow-200 shadow-sm',
+    red: 'text-red-600 bg-red-50 border-red-200 shadow-sm'
   };
 
   const trendColor = {
@@ -44,9 +44,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <div className="professional-card p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg">
+    <div className="professional-card p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl border border-gray-100 shadow-sm">
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-xl border ${colorClasses[color]} shadow-sm`}>
+        <div className={`p-3 rounded-xl border ${colorClasses[color]}`}>
           <Icon className="w-6 h-6" />
         </div>
         {change && (

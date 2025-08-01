@@ -38,7 +38,6 @@ const AdminDashboard: React.FC = () => {
   const getPageTitle = () => {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard Overview';
-      case 'analytics': return 'System Analytics';
       case 'students': return 'All Students';
       case 'users': return 'User Management';
       case 'beacons': return 'BLE Beacon Manager';
@@ -65,8 +64,7 @@ const AdminDashboard: React.FC = () => {
           </div>
         );
       
-      case 'analytics':
-        return <Analytics />;
+
       
       case 'students':
         return <StudentsPage />;
