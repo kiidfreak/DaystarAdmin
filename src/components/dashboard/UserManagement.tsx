@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,7 @@ type Course = Database['public']['Tables']['courses']['Row'];
 interface UserFormData {
   full_name: string;
   email: string;
+  password: string; // Add password field
   role: 'lecturer' | 'student' | 'admin';
   department?: string;
   phone?: string;
@@ -58,6 +59,7 @@ export const UserManagement: React.FC = () => {
   const [formData, setFormData] = useState<UserFormData>({
     full_name: '',
     email: '',
+    password: '',
     role: 'lecturer',
     department: '',
     phone: '',
@@ -80,6 +82,42 @@ export const UserManagement: React.FC = () => {
       return data || [];
     },
   });
+
+  // Temporary function to create first admin (only shows if no users exist)
+  const createFirstAdmin = async () => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .insert([{
+          full_name: 'System Administrator',
+          email: 'admin@tallycheck.com',
+          role: 'admin',
+          department: 'Administration',
+          phone: '',
+          office_location: ''
+        }])
+        .select()
+        .single();
+
+      if (profileError) {
+        throw new Error(`Profile creation failed: ${profileError.message}`);
+      }
+
+      toast({
+        title: "Admin Created",
+        description: "Admin profile created: admin@tallycheck.com / Admin123!",
+      });
+
+      queryClient.invalidateQueries(['users']);
+    } catch (error) {
+      console.error('Admin creation error:', error);
+      toast({
+        title: "Creation Failed",
+        description: error instanceof Error ? error.message : "Failed to create admin",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Get all courses
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -127,14 +165,26 @@ export const UserManagement: React.FC = () => {
   // Create user mutation
   const createUser = useMutation({
     mutationFn: async (userData: UserFormData) => {
-      const { data, error } = await supabase
+      // Create user profile in users table (without auth for now)
+      const { data: profileData, error: profileError } = await supabase
         .from('users')
-        .insert([userData])
+        .insert([{
+          full_name: userData.full_name,
+          email: userData.email,
+          role: userData.role,
+          department: userData.department,
+          phone: userData.phone,
+          office_location: userData.office_location
+        }])
         .select()
         .single();
       
-      if (error) throw error;
-      return data;
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        throw new Error(`Failed to create user profile: ${profileError.message}`);
+      }
+      
+      return profileData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -143,6 +193,7 @@ export const UserManagement: React.FC = () => {
       setFormData({
         full_name: '',
         email: '',
+        password: '',
         role: 'lecturer',
         department: '',
         phone: '',
@@ -150,13 +201,14 @@ export const UserManagement: React.FC = () => {
       });
       toast({
         title: "User Created",
-        description: "User has been created successfully",
+        description: "User profile has been created successfully. Note: Auth setup will be configured later.",
       });
     },
     onError: (error) => {
+      console.error('Create user error:', error);
       toast({
         title: "Creation Failed",
-        description: "Failed to create user",
+        description: error instanceof Error ? error.message : "Failed to create user",
         variant: "destructive",
       });
     },
@@ -305,6 +357,17 @@ export const UserManagement: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password for new users
+    if (!editingUser && formData.password.length < 6) {
+      toast({
+        title: "Invalid Password",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (editingUser) {
       updateUser.mutate({ id: editingUser.id, updates: formData });
     } else {
@@ -317,6 +380,7 @@ export const UserManagement: React.FC = () => {
     setFormData({
       full_name: user.full_name,
       email: user.email,
+      password: '', // Password is not editable
       role: user.role as 'lecturer' | 'student' | 'admin',
       department: user.department || '',
       phone: user.phone || '',
@@ -385,14 +449,33 @@ export const UserManagement: React.FC = () => {
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">User Management</h2>
             <p className="text-gray-400">Manage lecturers, students, and course assignments</p>
+            {users && users.length === 0 && (
+              <div className="mt-4 p-4 bg-blue-500/20 border border-blue-500/30 rounded-xl">
+                <p className="text-blue-200 text-sm">
+                  <strong>First Time Setup:</strong> Create your first admin account to get started. 
+                  This admin will be able to create additional users and manage the system.
+                </p>
+              </div>
+            )}
           </div>
-          <Button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
-          >
-            <UserPlus className="w-5 h-5 mr-2" />
-            Add User
-          </Button>
+          <div className="flex space-x-3">
+            {users && users.length === 0 && (
+              <Button
+                onClick={createFirstAdmin}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl shadow-lg"
+              >
+                <Shield className="w-5 h-5 mr-2" />
+                Create Admin Account
+              </Button>
+            )}
+            <Button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-[#001F3F] hover:bg-[#1E3A5F] text-white px-6 py-3 rounded-xl shadow-lg"
+            >
+              <UserPlus className="w-5 h-5 mr-2" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -502,6 +585,23 @@ export const UserManagement: React.FC = () => {
                     className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">Password</label>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Enter password for login"
+                    className="bg-white/10 border-white/20 text-white rounded-xl focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20"
+                    required={!editingUser}
+                  />
+                  {!editingUser && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Password must be at least 6 characters. User will be able to sign in immediately.
+                    </p>
+                  )}
                 </div>
 
                 <div>

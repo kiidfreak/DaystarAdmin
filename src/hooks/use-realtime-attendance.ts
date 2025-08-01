@@ -6,9 +6,16 @@ import { useToast } from './use-toast';
 export const useRealtimeAttendance = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [isConnected, setIsConnected] = useState(false);
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const [isBrowserOnline, setIsBrowserOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   useEffect(() => {
+    // Listen for browser online/offline events
+    const handleOnline = () => setIsBrowserOnline(true);
+    const handleOffline = () => setIsBrowserOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     // Subscribe to real-time attendance updates
     const attendanceSubscription = supabase
       .channel('attendance_updates')
@@ -21,11 +28,9 @@ export const useRealtimeAttendance = () => {
         },
         (payload) => {
           console.log('Real-time attendance update:', payload);
-          
           // Invalidate and refetch attendance queries
           queryClient.invalidateQueries({ queryKey: ['attendance'] });
           queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-          
           // Show toast notification for new attendance
           if (payload.eventType === 'INSERT') {
             toast({
@@ -36,7 +41,7 @@ export const useRealtimeAttendance = () => {
         }
       )
       .subscribe((status) => {
-        setIsConnected(status === 'SUBSCRIBED');
+        setIsRealtimeConnected(status === 'SUBSCRIBED');
         console.log('Real-time subscription status:', status);
       });
 
@@ -100,8 +105,12 @@ export const useRealtimeAttendance = () => {
       sessionSubscription.unsubscribe();
       beaconSubscription.unsubscribe();
       userSubscription.unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, [queryClient, toast]);
 
+  // isConnected is true if browser is online
+  const isConnected = isBrowserOnline;
   return { isConnected };
 }; 

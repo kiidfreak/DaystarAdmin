@@ -117,7 +117,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
           label: 'Sessions',
           icon: Calendar,
           items: [
-            { id: 'lecturer-presence', label: 'My Sessions', icon: UserCheck },
             { id: 'sessions', label: 'Session Manager', icon: Calendar },
           ]
         },
@@ -127,6 +126,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
           icon: FileText,
           items: [
             { id: 'reports', label: 'Reports', icon: Clock },
+          ]
+        },
+        {
+          id: 'profile',
+          label: 'Profile',
+          icon: User,
+          items: [
+            { id: 'profile', label: 'My Profile', icon: User },
           ]
         }
       );
@@ -141,6 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, activeTab, onTabChan
           items: [
             { id: 'analytics', label: 'Analytics', icon: Monitor },
             { id: 'attendance-analytics', label: 'Attendance Analytics', icon: BarChart3 },
+            { id: 'admin-reports', label: 'Admin Reports', icon: Activity },
           ]
         },
         {

@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { exportToPDF, formatAttendanceDataForExport } from '@/utils/pdfExport';
 import { PageLoading } from '@/components/ui/LoadingSpinner';
 import type { Database } from '@/lib/supabase';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 type ClassSession = Database['public']['Tables']['class_sessions']['Row'] & {
   courses?: {
@@ -248,9 +249,12 @@ export const LiveClasses: React.FC = () => {
   }
 
   const filteredSessions = getFilteredSessions();
-  const ongoingSessions = sessions?.filter(s => getSessionStatus(s) === 'ongoing').length || 0;
-  const upcomingSessions = sessions?.filter(s => getSessionStatus(s) === 'upcoming').length || 0;
-  const completedSessions = sessions?.filter(s => getSessionStatus(s) === 'completed').length || 0;
+  // Group sessions by status
+  const groupedSessions = {
+    ongoing: filteredSessions.filter(s => getSessionStatus(s) === 'ongoing'),
+    upcoming: filteredSessions.filter(s => getSessionStatus(s) === 'upcoming'),
+    completed: filteredSessions.filter(s => getSessionStatus(s) === 'completed'),
+  };
 
   const handleExportAttendance = () => {
     if (!liveAttendance || liveAttendance.length === 0) return;
@@ -336,7 +340,7 @@ export const LiveClasses: React.FC = () => {
             className={`rounded-xl ${getFilterButtonClass('ongoing')}`}
           >
             <Play className="w-4 h-4 mr-1" />
-            Ongoing ({ongoingSessions})
+            Ongoing ({groupedSessions.ongoing.length})
           </Button>
           <Button
             size="sm"
@@ -344,7 +348,7 @@ export const LiveClasses: React.FC = () => {
             className={`rounded-xl ${getFilterButtonClass('upcoming')}`}
           >
             <Clock className="w-4 h-4 mr-1" />
-            Upcoming ({upcomingSessions})
+            Upcoming ({groupedSessions.upcoming.length})
           </Button>
           <Button
             size="sm"
@@ -352,7 +356,7 @@ export const LiveClasses: React.FC = () => {
             className={`rounded-xl ${getFilterButtonClass('completed')}`}
           >
             <CheckCircle className="w-4 h-4 mr-1" />
-            Completed ({completedSessions})
+            Completed ({groupedSessions.completed.length})
           </Button>
         </div>
 
@@ -366,106 +370,193 @@ export const LiveClasses: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid gap-6">
-            {filteredSessions.map((session) => {
-              const status = getSessionStatus(session);
-              const attendance = getAttendanceForSession(session.id);
-              const course = session.courses;
-              const instructor = session.courses?.users;
-              
-              return (
-                <div key={session.id} className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-200 shadow-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4 mb-4">
-                        <div className="bg-purple-600/20 p-3 rounded-xl">
-                          <BookOpen className="w-6 h-6 text-purple-400" />
-                        </div>
-                        <div>
-                          <h4 className="text-xl font-semibold text-white mb-1">
-                            {course?.name || 'Unknown Course'}
-                          </h4>
-                          <p className="text-gray-400 text-sm">{course?.code}</p>
-                        </div>
-                        {getStatusBadge(status)}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                          <Users className="w-5 h-5 text-purple-400" />
-                          <div>
-                            <p className="text-sm text-gray-400">Instructor</p>
-                            <p className="text-white font-medium">{instructor?.full_name || 'Unassigned'}</p>
-                          </div>
-                        </div>
+          <Accordion type="multiple" className="grid gap-6">
+            {(['ongoing', 'upcoming', 'completed'] as const).map((status) => (
+              <AccordionItem key={status} value={status}>
+                <AccordionTrigger>
+                  <span className="flex items-center gap-2">
+                    {getStatusBadge(status)}
+                    <span className="capitalize font-semibold">{status} Classes</span>
+                    <span className="ml-2 text-xs text-gray-400">({groupedSessions[status].length})</span>
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {groupedSessions[status].length === 0 ? (
+                    <div className="p-6 text-center text-gray-400">No {status} classes</div>
+                  ) : (
+                    <div className="grid gap-6">
+                      {groupedSessions[status].map((session) => {
+                        const attendance = getAttendanceForSession(session.id);
+                        const course = session.courses;
+                        const instructor = session.courses?.users;
+                        const sessionStatus = getSessionStatus(session);
+                        const isCompleted = sessionStatus === 'completed';
                         
-                        <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                          <Clock className="w-5 h-5 text-purple-400" />
-                          <div>
-                            <p className="text-sm text-gray-400">Time</p>
-                            <p className="text-white font-medium">
-                              {session.start_time ? session.start_time.substring(0, 5) : '--'} - {session.end_time ? session.end_time.substring(0, 5) : '--'}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {session.location && (
-                          <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                            <MapPin className="w-5 h-5 text-purple-400" />
-                            <div>
-                              <p className="text-sm text-gray-400">Location</p>
-                              <p className="text-white font-medium">{session.location}</p>
+                        return (
+                          <div key={session.id} className={`backdrop-blur-lg rounded-2xl p-6 border transition-all duration-200 shadow-lg ${
+                            isCompleted 
+                              ? 'bg-white/90 border-gray-200 hover:bg-white/95' 
+                              : 'bg-white/10 border-white/20 hover:bg-white/15'
+                          }`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-4 mb-4">
+                                  <div className={`p-3 rounded-xl ${
+                                    isCompleted 
+                                      ? 'bg-green-100 border border-green-200' 
+                                      : 'bg-purple-600/20'
+                                  }`}>
+                                    <BookOpen className={`w-6 h-6 ${
+                                      isCompleted ? 'text-green-600' : 'text-purple-400'
+                                    }`} />
+                                  </div>
+                                  <div>
+                                    <h4 className={`text-xl font-semibold mb-1 ${
+                                      isCompleted ? 'text-gray-900' : 'text-white'
+                                    }`}>
+                                      {course?.name || 'Unknown Course'}
+                                    </h4>
+                                    <p className={`text-sm ${
+                                      isCompleted ? 'text-gray-600' : 'text-gray-400'
+                                    }`}>{course?.code}</p>
+                                  </div>
+                                  {getStatusBadge(sessionStatus)}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  <div className={`flex items-center space-x-3 p-3 rounded-xl ${
+                                    isCompleted 
+                                      ? 'bg-gray-50 border border-gray-100' 
+                                      : 'bg-white/5'
+                                  }`}>
+                                    <Users className={`w-5 h-5 ${
+                                      isCompleted ? 'text-gray-600' : 'text-purple-400'
+                                    }`} />
+                                    <div>
+                                      <p className={`text-sm ${
+                                        isCompleted ? 'text-gray-500' : 'text-gray-400'
+                                      }`}>Instructor</p>
+                                      <p className={`font-medium ${
+                                        isCompleted ? 'text-gray-900' : 'text-white'
+                                      }`}>{instructor?.full_name || 'Unassigned'}</p>
+                                    </div>
+                                  </div>
+                                  <div className={`flex items-center space-x-3 p-3 rounded-xl ${
+                                    isCompleted 
+                                      ? 'bg-gray-50 border border-gray-100' 
+                                      : 'bg-white/5'
+                                  }`}>
+                                    <Clock className={`w-5 h-5 ${
+                                      isCompleted ? 'text-gray-600' : 'text-purple-400'
+                                    }`} />
+                                    <div>
+                                      <p className={`text-sm ${
+                                        isCompleted ? 'text-gray-500' : 'text-gray-400'
+                                      }`}>Time</p>
+                                      <p className={`font-medium ${
+                                        isCompleted ? 'text-gray-900' : 'text-white'
+                                      }`}>
+                                        {session.start_time ? session.start_time.substring(0, 5) : '--'} - {session.end_time ? session.end_time.substring(0, 5) : '--'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {session.location && (
+                                    <div className={`flex items-center space-x-3 p-3 rounded-xl ${
+                                      isCompleted 
+                                        ? 'bg-gray-50 border border-gray-100' 
+                                        : 'bg-white/5'
+                                    }`}>
+                                      <MapPin className={`w-5 h-5 ${
+                                        isCompleted ? 'text-gray-600' : 'text-purple-400'
+                                      }`} />
+                                      <div>
+                                        <p className={`text-sm ${
+                                          isCompleted ? 'text-gray-500' : 'text-gray-400'
+                                        }`}>Location</p>
+                                        <p className={`font-medium ${
+                                          isCompleted ? 'text-gray-900' : 'text-white'
+                                        }`}>{session.location}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className={`flex items-center space-x-3 p-3 rounded-xl ${
+                                    isCompleted 
+                                      ? 'bg-gray-50 border border-gray-100' 
+                                      : 'bg-white/5'
+                                  }`}>
+                                    <TrendingUp className={`w-5 h-5 ${
+                                      isCompleted ? 'text-gray-600' : 'text-purple-400'
+                                    }`} />
+                                    <div>
+                                      <p className={`text-sm ${
+                                        isCompleted ? 'text-gray-500' : 'text-gray-400'
+                                      }`}>Attendance</p>
+                                      <p className={`font-medium ${
+                                        isCompleted ? 'text-gray-900' : 'text-white'
+                                      }`}>
+                                        {attendance.present}/{attendance.total} ({attendance.total > 0 ? Math.round((attendance.present / attendance.total) * 100) : 0}%)
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Attendance Details */}
+                                {sessionStatus === 'ongoing' && (
+                                  <div className="mt-4 pt-4 border-t border-white/10">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-sm font-medium text-white">Live Attendance</h5>
+                                      <div className="flex space-x-2">
+                                        <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                                          {attendance.present} Present
+                                        </Badge>
+                                        <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                                          {attendance.absent} Absent
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Completed Class Summary */}
+                                {isCompleted && (
+                                  <div className="mt-4 pt-4 border-t border-gray-200">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-sm font-medium text-gray-700">Session Summary</h5>
+                                      <div className="flex space-x-2">
+                                        <Badge className="bg-green-100 text-green-700 border-green-200">
+                                          ✅ Completed
+                                        </Badge>
+                                        <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                          {attendance.present} Students
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex space-x-3 ml-6">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedSession(session);
+                                    setShowDetailsModal(true);
+                                  }}
+                                  className={`rounded-xl px-4 py-2 ${
+                                    isCompleted 
+                                      ? 'bg-blue-600 hover:bg-blue-700 text-white border border-blue-600' 
+                                      : 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30'
+                                  }`}
+                                >
+                                  Details
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        )}
-                        
-                        <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-xl">
-                          <TrendingUp className="w-5 h-5 text-purple-400" />
-                          <div>
-                            <p className="text-sm text-gray-400">Attendance</p>
-                            <p className="text-white font-medium">
-                              {attendance.present}/{attendance.total} ({attendance.total > 0 ? Math.round((attendance.present / attendance.total) * 100) : 0}%)
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Attendance Details */}
-                      {status === 'ongoing' && (
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                          <div className="flex items-center justify-between">
-                            <h5 className="text-sm font-medium text-white">Live Attendance</h5>
-                            <div className="flex space-x-2">
-                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                                {attendance.present} Present
-                              </Badge>
-                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                                {attendance.absent} Absent
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-                    
-                    <div className="flex space-x-3 ml-6">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedSession(session);
-                          setShowDetailsModal(true);
-                        }}
-                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30 rounded-xl px-4 py-2"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         )}
 
         {/* Session Details Modal */}

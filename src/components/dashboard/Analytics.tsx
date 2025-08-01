@@ -70,97 +70,80 @@ export const Analytics: React.FC = () => {
   const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
   const { user } = useUser();
 
-  // Get all lecturers with their statistics (real-time)
+  // Calculate date range based on timeFilter
+  const today = new Date();
+  let startDate: Date, endDate: Date;
+  if (timeFilter === 'week') {
+    const day = today.getDay();
+    startDate = new Date(today);
+    startDate.setDate(today.getDate() - day);
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+  } else if (timeFilter === 'month') {
+    startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  } else {
+    // semester: Jan 1–June 30 or July 1–Dec 31
+    if (today.getMonth() < 6) {
+      startDate = new Date(today.getFullYear(), 0, 1);
+      endDate = new Date(today.getFullYear(), 5, 30);
+    } else {
+      startDate = new Date(today.getFullYear(), 6, 1);
+      endDate = new Date(today.getFullYear(), 11, 31);
+    }
+  }
+  const startDateStr = startDate.toISOString().split('T')[0];
+  const endDateStr = endDate.toISOString().split('T')[0];
+
+  // Get all lecturers with their statistics (real-time, filtered)
   const { data: lecturers, isLoading: lecturersLoading } = useQuery({
-    queryKey: ['analytics', 'lecturers'],
+    queryKey: ['analytics', 'lecturers', timeFilter],
     queryFn: async () => {
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('*')
         .eq('role', 'lecturer')
         .order('full_name');
-      
       if (usersError) throw usersError;
-
       const lecturerStats: LecturerStats[] = [];
-
       for (const lecturer of users || []) {
         // Get lecturer's courses
         const { data: courses, error: coursesError } = await supabase
           .from('courses')
           .select('*')
           .eq('instructor_id', lecturer.id);
-        
         if (coursesError) continue;
-
         const courseIds = courses?.map(c => c.id) || [];
-        
-        // Get all sessions for lecturer's courses
+        // Get all sessions for lecturer's courses in range
         const { data: sessions, error: sessionsError } = await supabase
           .from('class_sessions')
           .select('*')
           .in('course_id', courseIds)
+          .gte('session_date', startDateStr)
+          .lte('session_date', endDateStr)
           .order('session_date');
-        
         if (sessionsError) continue;
-
-        // Get attendance records
+        // Get attendance records in range
         const { data: attendance, error: attendanceError } = await supabase
           .from('attendance_records')
           .select('*')
-          .in('course_id', courseIds);
-        
+          .in('course_id', courseIds)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
         if (attendanceError) continue;
-
-        // Calculate statistics
-        const today = new Date();
-        const thisWeekStart = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
-        const nextWeekStart = new Date(thisWeekStart.getTime() + (7 * 24 * 60 * 60 * 1000));
-
+        // Calculate statistics (same as before)
         const totalSessions = sessions?.length || 0;
         const completedSessions = sessions?.filter(s => new Date(s.session_date) < today).length || 0;
         const remainingSessions = totalSessions - completedSessions;
         const thisWeekSessions = sessions?.filter(s => {
           const sessionDate = new Date(s.session_date);
-          return sessionDate >= thisWeekStart && sessionDate < nextWeekStart;
+          return sessionDate >= startDate && sessionDate <= endDate;
         }).length || 0;
-        const nextWeekSessions = sessions?.filter(s => {
-          const sessionDate = new Date(s.session_date);
-          const nextWeekEnd = new Date(nextWeekStart.getTime() + (7 * 24 * 60 * 60 * 1000));
-          return sessionDate >= nextWeekStart && sessionDate < nextWeekEnd;
-        }).length || 0;
-
-        // Calculate attendance rate
+        const nextWeekSessions = 0; // Not used in filtered view
         const totalAttendanceRecords = attendance?.length || 0;
         const presentRecords = attendance?.filter(a => a.status === 'verified').length || 0;
         const averageAttendance = totalAttendanceRecords > 0 ? (presentRecords / totalAttendanceRecords) * 100 : 0;
-
-        // Calculate performance score (based on attendance rate and session completion)
-        const performanceScore = Math.round((averageAttendance * 0.7) + ((completedSessions / totalSessions) * 30));
-
-        // Determine attendance trend
-        const recentAttendance = attendance?.filter(a => {
-          const recordDate = new Date(a.created_at);
-          const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-          return recordDate >= weekAgo;
-        }) || [];
-        
-        const olderAttendance = attendance?.filter(a => {
-          const recordDate = new Date(a.created_at);
-          const twoWeeksAgo = new Date(today.getTime() - (14 * 24 * 60 * 60 * 1000));
-          const weekAgo = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-          return recordDate >= twoWeeksAgo && recordDate < weekAgo;
-        }) || [];
-
-        const recentRate = recentAttendance.length > 0 ? 
-          (recentAttendance.filter(a => a.status === 'verified').length / recentAttendance.length) * 100 : 0;
-        const olderRate = olderAttendance.length > 0 ? 
-          (olderAttendance.filter(a => a.status === 'verified').length / olderAttendance.length) * 100 : 0;
-
-        let attendanceTrend: 'up' | 'down' | 'stable' = 'stable';
-        if (recentRate > olderRate + 5) attendanceTrend = 'up';
-        else if (recentRate < olderRate - 5) attendanceTrend = 'down';
-
+        const performanceScore = Math.round((averageAttendance * 0.7) + ((completedSessions / (totalSessions || 1)) * 30));
         lecturerStats.push({
           id: lecturer.id,
           name: lecturer.full_name,
@@ -173,84 +156,93 @@ export const Analytics: React.FC = () => {
           totalStudents: new Set(attendance?.map(a => a.student_id)).size,
           thisWeekSessions,
           nextWeekSessions,
-          attendanceTrend,
+          attendanceTrend: 'stable',
           performanceScore
         });
       }
-
       return lecturerStats;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time data
+    refetchInterval: 30000,
   });
 
-  // Get system-wide statistics (real-time)
+  // Get system-wide statistics (real-time, filtered)
   const { data: systemStats, isLoading: systemLoading } = useQuery({
-    queryKey: ['analytics', 'system'],
+    queryKey: ['analytics', 'system', timeFilter],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      
       // Get all users
       const { data: users, error: usersError } = await supabase
         .from('users')
         .select('*');
-      
       if (usersError) throw usersError;
-
       // Get all courses
       const { data: courses, error: coursesError } = await supabase
         .from('courses')
         .select('*');
-      
       if (coursesError) throw coursesError;
-
-      // Get all sessions
+      // Get all sessions in range
       const { data: sessions, error: sessionsError } = await supabase
         .from('class_sessions')
-        .select('*');
-      
+        .select('*')
+        .gte('session_date', startDateStr)
+        .lte('session_date', endDateStr);
       if (sessionsError) throw sessionsError;
-
-      // Get today's attendance
-      const { data: todayAttendance, error: attendanceError } = await supabase
+      // Get attendance in range
+      const { data: attendance, error: attendanceError } = await supabase
         .from('attendance_records')
         .select('*')
-        .eq('date', today);
-      
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
       if (attendanceError) throw attendanceError;
-
-      // Get beacons
-      const { data: beacons, error: beaconsError } = await supabase
-        .from('ble_beacons')
-        .select('*')
-        .eq('is_active', true);
-      
-      if (beaconsError) throw beaconsError;
-
+      // Calculate stats
       const totalLecturers = users?.filter(u => u.role === 'lecturer').length || 0;
       const totalStudents = users?.filter(u => u.role === 'student').length || 0;
       const totalCourses = courses?.length || 0;
       const totalSessions = sessions?.length || 0;
-      const todayAttendanceCount = new Set(todayAttendance?.map(a => a.student_id)).size || 0;
-      const averageAttendanceRate = totalStudents > 0 ? (todayAttendanceCount / totalStudents) * 100 : 0;
-      const activeBeacons = beacons?.length || 0;
-
-      // Calculate growth rates (simplified)
-      const weeklyGrowth = 5.2; // Mock data
-      const monthlyGrowth = 12.8; // Mock data
-
+      const attendanceCount = new Set(attendance?.map(a => a.student_id)).size || 0;
+      const averageAttendanceRate = totalStudents > 0 ? (attendanceCount / totalStudents) * 100 : 0;
+      // Calculate growth rates
+      // Previous period for growth
+      let prevStart, prevEnd;
+      if (timeFilter === 'week') {
+        prevStart = new Date(startDate);
+        prevStart.setDate(startDate.getDate() - 7);
+        prevEnd = new Date(startDate);
+        prevEnd.setDate(startDate.getDate() - 1);
+      } else if (timeFilter === 'month') {
+        prevStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+        prevEnd = new Date(startDate.getFullYear(), startDate.getMonth(), 0);
+      } else {
+        // semester
+        if (startDate.getMonth() < 6) {
+          prevStart = new Date(startDate.getFullYear() - 1, 6, 1);
+          prevEnd = new Date(startDate.getFullYear() - 1, 11, 31);
+        } else {
+          prevStart = new Date(startDate.getFullYear(), 0, 1);
+          prevEnd = new Date(startDate.getFullYear(), 5, 30);
+        }
+      }
+      const prevStartStr = prevStart.toISOString().split('T')[0];
+      const prevEndStr = prevEnd.toISOString().split('T')[0];
+      const { data: prevAttendance } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .gte('date', prevStartStr)
+        .lte('date', prevEndStr);
+      const prevAttendanceCount = new Set(prevAttendance?.map(a => a.student_id)).size || 0;
+      const growth = prevAttendanceCount > 0 ? ((attendanceCount - prevAttendanceCount) / prevAttendanceCount) * 100 : 0;
       return {
         totalLecturers,
         totalStudents,
         totalCourses,
         totalSessions,
         averageAttendanceRate,
-        activeBeacons,
-        todayAttendance: todayAttendanceCount,
-        weeklyGrowth,
-        monthlyGrowth
+        activeBeacons: 0, // Add if needed
+        todayAttendance: attendanceCount,
+        weeklyGrowth: timeFilter === 'week' ? growth : 0,
+        monthlyGrowth: timeFilter === 'month' ? growth : 0
       };
     },
-    refetchInterval: 30000, // Refresh every 30 seconds for real-time data
+    refetchInterval: 30000,
   });
 
   if (lecturersLoading || systemLoading) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Clock, Users, TrendingUp, Eye, EyeOff, Filter } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, TrendingUp, Eye, EyeOff, Filter, BookOpen, FileText } from 'lucide-react';
 import { useCourses, useSessionsByCourse } from '@/hooks/use-api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -9,6 +9,7 @@ import { CardLoading } from '@/components/ui/LoadingSpinner';
 import { EnhancedAttendanceReport } from './EnhancedAttendanceReport';
 import type { Database } from '@/lib/supabase';
 import { Input } from '@/components/ui/input';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import {
   Dialog,
   DialogTrigger,
@@ -43,24 +44,25 @@ interface AttendanceReport {
 }
 
 // Enhanced attendance data with student names
-const useAttendanceReports = (courseId: string, courseCode: string) => {
+const useAttendanceReports = (courseId: string, courseCode: string, isInactive: boolean = false) => {
   const { data: attendanceRecords, isLoading, error } = useQuery({
-    queryKey: ['attendance', 'course', courseId, courseCode],
+    queryKey: ['attendance', 'course', courseId, courseCode, isInactive],
     queryFn: async () => {
-      if (!courseCode) return [];
-      const { data, error } = await supabase
+      if (!courseId && !courseCode) return [];
+      let query = supabase
         .from('attendance_records')
-        .select(`
-          *,
-          users!inner(full_name, email, student_number)
-        `)
-        .eq('course_code', courseCode)
-        .gte('date', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('date', { ascending: false });
+        .select(`*, users!inner(full_name, email, student_number)`)
+        .eq('course_id', courseId);
+      if (!isInactive) {
+        query = query.gte('date', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      }
+      const { data, error } = await query.order('date', { ascending: false });
       if (error) throw error;
+      // Debug log
+      console.log('Fetched attendanceRecords for courseId:', courseId, 'isInactive:', isInactive, data);
       return data || [];
     },
-    enabled: !!courseCode,
+    enabled: !!courseId,
     refetchInterval: 5000, // Real-time updates
   });
 
@@ -99,15 +101,16 @@ const useAttendanceReports = (courseId: string, courseCode: string) => {
 
     // Convert to AttendanceReport format
     Object.entries(groupedByDate).forEach(([date, stats]) => {
+      const s = stats as { present: number; absent: number; late: number; total: number; students?: any[] };
       reports.push({
         date: new Date(date).toLocaleDateString(),
-        present: stats.present,
-        absent: stats.absent,
-        late: stats.late,
-        total: stats.total,
-        attendanceRate: stats.total > 0 ? Math.round((stats.present / stats.total) * 100) : 0
+        present: s.present,
+        absent: s.absent,
+        late: s.late,
+        total: s.total,
+        attendanceRate: s.total > 0 ? Math.round((s.present / s.total) * 100) : 0
       });
-      studentDetails[date] = stats.students;
+      studentDetails[date] = s.students || [];
     });
   }
 
@@ -467,6 +470,40 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
       ? { start: weekStart.toISOString().split('T')[0], end: weekEnd.toISOString().split('T')[0] }
       : { start: monthStart.toISOString().split('T')[0], end: monthEnd.toISOString().split('T')[0] };
 
+  // Fetch all sessions for all courses
+  const { data: allSessions, isLoading: sessionsLoading } = useQuery({
+    queryKey: ['all-sessions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('class_sessions')
+        .select('id, course_id, session_date, start_time, end_time');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Group courses by session status
+  const now = new Date();
+  const groupedCourses = {
+    active: [] as Course[],
+    inactive: [] as Course[],
+  };
+  filteredCourses.forEach((course) => {
+    const sessions = (allSessions || []).filter(s => s.course_id === course.id);
+    const hasFutureOrOngoing = sessions.some(s => {
+      const sessionDate = new Date(s.session_date);
+      const startTime = s.start_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${s.start_time}`) : null;
+      const endTime = s.end_time ? new Date(`${sessionDate.toISOString().split('T')[0]}T${s.end_time}`) : null;
+      if (!startTime || !endTime) return false;
+      return now < endTime;
+    });
+    if (hasFutureOrOngoing) {
+      groupedCourses.active.push(course);
+    } else {
+      groupedCourses.inactive.push(course);
+    }
+  });
+
   if (isLoading) {
     return <CardLoading text="Loading courses..." />;
   }
@@ -560,20 +597,47 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
         <h2 className="text-xl font-bold text-white mb-6">All Courses</h2>
         {/* Export All Courses Buttons */}
         <div className="flex gap-2 mb-4">
-          <Button onClick={exportAllCoursesCSV} variant="outline">Export All to CSV</Button>
+          <Button
+            onClick={exportAllCoursesCSV}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 shadow"
+          >
+            <FileText className="w-4 h-4" />
+            Export All to CSV
+          </Button>
         </div>
         
-        <div className="grid gap-6">
-          {filteredCourses.map((course) => (
-            <CourseAttendanceCard
-              key={course.id}
-              course={course}
-              reports={allCourseReports[course.id] || []}
-              isSelected={selectedCourse === course.id}
-              onSelect={() => setSelectedCourse(selectedCourse === course.id ? null : course.id)}
-            />
+        <Accordion type="multiple" className="grid gap-6">
+          {(['active', 'inactive'] as const).map((status) => (
+            <AccordionItem key={status} value={status}>
+              <AccordionTrigger>
+                <span className="flex items-center gap-2">
+                  <BookOpen className={`w-5 h-5 ${
+                    status === 'active' ? 'text-green-500' : 'text-gray-500'
+                  }`} />
+                  <span className="capitalize font-semibold">{status} Courses</span>
+                  <span className="ml-2 text-xs text-gray-400">({groupedCourses[status].length})</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                {groupedCourses[status].length === 0 ? (
+                  <div className="p-6 text-center text-gray-400">No {status} courses</div>
+                ) : (
+                  <div className="grid gap-6">
+                    {groupedCourses[status].map((course) => (
+                      <CourseAttendanceCard
+                        key={course.id}
+                        course={course}
+                        reports={allCourseReports[course.id] || []}
+                        isSelected={selectedCourse === course.id}
+                        onSelect={() => setSelectedCourse(selectedCourse === course.id ? null : course.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
           ))}
-        </div>
+        </Accordion>
         
         {filteredCourses.length === 0 && globalSearchTerm && (
           <div className="text-center py-8 text-gray-400">
@@ -615,9 +679,8 @@ export const ClassesOverview: React.FC<ClassesOverviewProps> = ({ globalSearchTe
   );
 };
 
-// Add this new component above ClassesOverview
 const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport[]; isSelected: boolean; onSelect: () => void }> = ({ course, reports, isSelected, onSelect }) => {
-  const { reports: courseReports, studentDetails, isLoading } = useAttendanceReports(course.id, course.code);
+  const { reports: courseReports, studentDetails, isLoading } = useAttendanceReports(course.id, course.code, false);
   
   const exportCourseReportCSV = (courseName: string, courseCode: string, reports: AttendanceReport[]) => {
     const headers = ['Date', 'Present', 'Late', 'Absent', 'Total', 'Attendance Rate'];
@@ -767,54 +830,97 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
   };
 
   return (
-    <div className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors shadow-lg">
+    <div className={`backdrop-blur-lg rounded-2xl p-6 border transition-all duration-200 shadow-lg ${
+      reports.length > 0 
+        ? 'bg-white/90 border-gray-200 hover:bg-white/95' 
+        : 'bg-gray-100/90 border-gray-300 hover:bg-gray-100/95'
+    }`}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center space-x-3 mb-2">
-            <h3 className="text-lg font-semibold text-white">{course.name}</h3>
-            <Badge className="bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl">
-              {course.code}
-            </Badge>
+            <div className={`p-2 rounded-xl ${
+              reports.length > 0 
+                ? 'bg-green-100 border border-green-200' 
+                : 'bg-gray-100 border border-gray-200'
+            }`}>
+              <BookOpen className={`w-5 h-5 ${
+                reports.length > 0 ? 'text-green-600' : 'text-gray-600'
+              }`} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-semibold ${
+                reports.length > 0 ? 'text-gray-900' : 'text-gray-700'
+              }`}>{course.name}</h3>
+              <Badge className={`rounded-xl ${
+                reports.length > 0 
+                  ? 'bg-green-100 text-green-700 border-green-200' 
+                  : 'bg-gray-100 text-gray-700 border-gray-200'
+              }`}>
+                {course.code}
+              </Badge>
+            </div>
           </div>
-          <p className="text-gray-400 mb-3">{(course as any).users?.full_name || 'No instructor assigned'}</p>
+          <p className={`mb-3 ${
+            reports.length > 0 ? 'text-gray-600' : 'text-gray-500'
+          }`}>{(course as any).users?.full_name || 'No instructor assigned'}</p>
         </div>
         <Button
           size="sm"
           onClick={onSelect}
-          className="bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-xl"
+          className={`rounded-xl px-4 py-2 ${
+            isSelected 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white border border-blue-600' 
+              : 'bg-gray-600 hover:bg-gray-700 text-white border border-gray-600'
+          }`}
         >
           {isSelected ? <EyeOff className="w-4 h-4 mr-1" /> : <Eye className="w-4 h-4 mr-1" />}
           {isSelected ? 'Hide' : 'View'} Reports
         </Button>
       </div>
-      <div className="flex flex-wrap gap-4 mb-4 text-gray-300">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-wrap gap-4 mb-4">
+        <div className={`flex items-center space-x-2 ${
+          reports.length > 0 ? 'text-gray-600' : 'text-gray-500'
+        }`}>
           <Clock className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Course Code: {course.code}</span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className={`flex items-center space-x-2 ${
+          reports.length > 0 ? 'text-gray-600' : 'text-gray-500'
+        }`}>
           <MapPin className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Created: {new Date(course.created_at).toLocaleDateString()}</span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className={`flex items-center space-x-2 ${
+          reports.length > 0 ? 'text-gray-600' : 'text-gray-500'
+        }`}>
           <Users className="w-4 h-4 text-blue-400" />
           <span className="text-sm">Course ID: {course.id.slice(0, 8)}...</span>
         </div>
       </div>
       <div className="flex items-center space-x-2 mb-4">
         <Calendar className="w-4 h-4 text-blue-400" />
-        <Badge className="text-xs border rounded-lg bg-blue-500/20 text-blue-400 border-blue-500/30">
-          Active Course
+        <Badge className={`text-xs border rounded-lg ${
+          reports.length > 0 
+            ? 'bg-green-100 text-green-700 border-green-200' 
+            : 'bg-gray-100 text-gray-700 border-gray-200'
+        }`}>
+          {reports.length > 0 ? 'Active Course' : 'Inactive Course'}
         </Badge>
       </div>
       {isSelected && (
         <div className="mt-6">
-          <h4 className="text-md font-semibold text-white mb-2">Attendance Reports (Last 2 Weeks)</h4>
-          <div className="flex gap-2 mb-4">
-            <Button size="sm" variant="outline" onClick={() => exportCourseReportCSV(course.name, course.code, courseReports)}>
-              Export CSV
-            </Button>
-          </div>
+          {reports.length > 0 && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-semibold">Attendance Reports (Last 2 Weeks)</span>
+              <Button
+                onClick={() => exportCourseReportCSV(course.name, course.code, reports)}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1 flex items-center gap-2 text-xs shadow"
+              >
+                <FileText className="w-4 h-4" />
+                Export CSV
+              </Button>
+            </div>
+          )}
           {isLoading ? (
             <div className="text-gray-400">Loading attendance data...</div>
           ) : courseReports.length === 0 ? (
@@ -822,25 +928,25 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
           ) : (
             <div className="space-y-4">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-xs text-left text-gray-300">
+                <table className="min-w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-white/10">
-                      <th className="px-3 py-2">Date</th>
-                      <th className="px-3 py-2">Present</th>
-                      <th className="px-3 py-2">Late</th>
-                      <th className="px-3 py-2">Absent</th>
-                      <th className="px-3 py-2">Total</th>
-                      <th className="px-3 py-2">Attendance Rate</th>
+                    <tr className="bg-gray-50">
+                      <th className="px-3 py-2 text-gray-700">Date</th>
+                      <th className="px-3 py-2 text-gray-700">Present</th>
+                      <th className="px-3 py-2 text-gray-700">Late</th>
+                      <th className="px-3 py-2 text-gray-700">Absent</th>
+                      <th className="px-3 py-2 text-gray-700">Total</th>
+                      <th className="px-3 py-2 text-gray-700">Attendance Rate</th>
                     </tr>
                   </thead>
                   <tbody>
                     {courseReports.map((r, i) => (
-                      <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="px-3 py-2">{r.date}</td>
-                        <td className="px-3 py-2">{r.present}</td>
-                        <td className="px-3 py-2">{r.late}</td>
-                        <td className="px-3 py-2">{r.absent}</td>
-                        <td className="px-3 py-2">{r.total}</td>
+                      <tr key={i} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-3 py-2 text-gray-900">{r.date}</td>
+                        <td className="px-3 py-2 text-gray-900">{r.present}</td>
+                        <td className="px-3 py-2 text-gray-900">{r.late}</td>
+                        <td className="px-3 py-2 text-gray-900">{r.absent}</td>
+                        <td className="px-3 py-2 text-gray-900">{r.total}</td>
                         <td className="px-3 py-2 font-bold" style={{ color: r.attendanceRate >= 80 ? '#22c55e' : r.attendanceRate >= 50 ? '#eab308' : '#ef4444' }}>{r.attendanceRate}%</td>
                       </tr>
                     ))}
@@ -851,31 +957,33 @@ const CourseAttendanceCard: React.FC<{ course: Course; reports: AttendanceReport
               {/* Student Details Section */}
               {studentDetails && Object.keys(studentDetails).length > 0 && (
                 <div className="mt-6">
-                  <h5 className="text-sm font-semibold text-white mb-3">👥 Student Details</h5>
+                  <h5 className={`text-sm font-semibold mb-3 ${
+                    reports.length > 0 ? 'text-gray-900' : 'text-gray-700'
+                  }`}>👥 Student Details</h5>
                   <div className="space-y-4">
                     {Object.entries(studentDetails).map(([date, students]) => (
-                      <div key={date} className="bg-white/5 rounded-lg p-4">
-                        <h6 className="text-xs font-semibold text-blue-400 mb-2">📅 {date}</h6>
+                      <div key={date} className="bg-gray-50 rounded-lg p-4">
+                        <h6 className="text-xs font-semibold text-blue-600 mb-2">📅 {date}</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                           {students.map((student, idx) => (
-                            <div key={idx} className="bg-white/5 rounded p-2 text-xs">
-                              <div className="font-medium text-white">{student.name}</div>
-                              <div className="text-gray-400">
+                            <div key={idx} className="bg-white rounded p-2 text-xs border border-gray-100">
+                              <div className="font-medium text-gray-900">{student.name}</div>
+                              <div className="text-gray-600">
                                 Status: <span className={`${
                                   student.status === 'present' || student.status === 'verified' 
-                                    ? 'text-green-400' 
+                                    ? 'text-green-600' 
                                     : student.status === 'late' 
-                                    ? 'text-yellow-400' 
-                                    : 'text-red-400'
+                                    ? 'text-yellow-600' 
+                                    : 'text-red-600'
                                 }`}>{student.status}</span>
                               </div>
                               {student.checkInTime && (
-                                <div className="text-gray-400">
+                                <div className="text-gray-600">
                                   Time: {new Date(student.checkInTime).toLocaleTimeString()}
                                 </div>
                               )}
                               {student.method && (
-                                <div className="text-gray-400">
+                                <div className="text-gray-600">
                                   Method: {student.method}
                                 </div>
                               )}

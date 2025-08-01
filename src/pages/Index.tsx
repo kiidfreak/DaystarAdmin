@@ -21,6 +21,9 @@ import { StudentDashboard } from '@/components/dashboard/StudentDashboard';
 import { AttendanceAnalytics } from '@/components/dashboard/AttendanceAnalytics';
 import { DeviceVerification } from '@/components/dashboard/DeviceVerification';
 import { LecturerPresence } from '@/components/dashboard/LecturerPresence';
+import { ProfilePage } from '@/components/dashboard/ProfilePage';
+import { AlertsPage } from '@/components/dashboard/AlertsPage';
+import { AdminReportsPage } from '@/components/dashboard/AdminReportsPage';
 
 import { useRealtimeAttendance } from '@/hooks/use-realtime-attendance';
 import { Users, Calendar, Clock, Monitor, Bell, Grid2X2, Bluetooth, BookOpen, AlertCircle, X, Smartphone, User } from 'lucide-react';
@@ -123,7 +126,9 @@ const Index = () => {
       alerts: 'Notifications',
       'attendance-analytics': 'Attendance Analytics',
       'device-verification': 'Device Verification',
-      'lecturer-presence': 'Lecturer Presence'
+      'lecturer-presence': 'Lecturer Presence',
+      'profile': 'My Profile',
+      'admin-reports': 'Admin Reports'
     };
     return titles[activeTab as keyof typeof titles] || 'Dashboard';
   };
@@ -172,6 +177,38 @@ const Index = () => {
               <StudentDashboard />
             ) : (
               <>
+                {/* Welcome Message for Lecturers */}
+                {userRole === 'lecturer' && (
+                  <div className="professional-card p-8 mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200">
+                    <div className="flex items-center space-x-6">
+                      <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                        <User className="w-10 h-10 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                          Welcome back, {user?.full_name}! 👋
+                        </h2>
+                        <p className="text-gray-700 text-lg font-medium leading-relaxed">
+                          Ready to inspire your students today? Let's make learning amazing! 🌟
+                        </p>
+                        <div className="mt-4 flex items-center space-x-4">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                            Active Session
+                          </span>
+                          <span className="text-gray-500 text-sm">
+                            {new Date().toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div onClick={() => handleMetricCardClick('all')} className="cursor-pointer">
                     <MetricCard 
@@ -217,7 +254,6 @@ const Index = () => {
                     />
                   </div>
                 </div>
-                
                 {userRole === 'admin' ? (
                   <LiveClasses />
                 ) : userRole === 'lecturer' ? (
@@ -305,36 +341,14 @@ const Index = () => {
       case 'lecturer-presence':
         return <LecturerPresence userRole={userRole} userId={user?.id} />;
       
+      case 'profile':
+        return <ProfilePage userRole={userRole} />;
+      
       case 'alerts':
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="w-full max-w-xl bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 border-2 border-yellow-400 rounded-3xl shadow-2xl p-8 glass-card flex flex-col" style={{minWidth: '340px'}}>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl font-extrabold text-yellow-400 tracking-wide">Notifications</span>
-              </div>
-              <div className="max-h-96 overflow-y-auto space-y-4">
-                {/* Dummy notifications for now */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-yellow-500/30 to-pink-500/10 border-2 border-yellow-400 flex items-center space-x-4 shadow-lg">
-                  <AlertCircle className="w-8 h-8 text-yellow-400" />
-                  <div>
-                    <div className="font-bold text-white text-lg">Low Attendance Alert</div>
-                    <div className="text-gray-200 text-base">Today's attendance rate is 68%</div>
-                    <div className="text-xs text-gray-400 mt-1">12:09 AM</div>
-                  </div>
-                </div>
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-red-500/30 to-pink-500/10 border-2 border-red-400 flex items-center space-x-4 shadow-lg">
-                  <AlertCircle className="w-8 h-8 text-red-400" />
-                  <div>
-                    <div className="font-bold text-white text-lg">BLE Beacon Issues</div>
-                    <div className="text-gray-200 text-base">2 BLE attendance records without beacon data</div>
-                    <div className="text-xs text-gray-400 mt-1">12:05 AM</div>
-                  </div>
-                </div>
-                {/* Add more notifications as needed */}
-              </div>
-            </div>
-          </div>
-        );
+        return <AlertsPage />;
+      
+      case 'admin-reports':
+        return <AdminReportsPage />;
       
       default:
         return (

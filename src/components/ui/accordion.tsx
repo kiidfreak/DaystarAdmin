@@ -12,7 +12,11 @@ const AccordionItem = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AccordionPrimitive.Item
     ref={ref}
-    className={cn("border-b", className)}
+    className={cn(
+      // Enhanced: glassy, rounded, shadow, margin
+      "bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-200 mb-4 overflow-hidden transition-all duration-300",
+      className
+    )}
     {...props}
   />
 ))
@@ -26,13 +30,14 @@ const AccordionTrigger = React.forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180",
+        // Enhanced: blue/white, bold, larger, glass, hover, focus, shadow
+        "flex flex-1 items-center justify-between px-6 py-5 text-lg font-semibold text-blue-900 bg-white/60 rounded-2xl shadow-md border border-blue-100 transition-all duration-300 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:ring-offset-2 cursor-pointer group [&[data-state=open]>svg]:rotate-180",
         className
       )}
       {...props}
     >
       {children}
-      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+      <ChevronDown className="h-5 w-5 shrink-0 text-blue-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
     </AccordionPrimitive.Trigger>
   </AccordionPrimitive.Header>
 ))
@@ -44,10 +49,14 @@ const AccordionContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    className="overflow-hidden text-base transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
     {...props}
   >
-    <div className={cn("pb-4 pt-0", className)}>{children}</div>
+    <div className={cn(
+      // Enhanced: glass, border, padding, shadow
+      "bg-white/70 backdrop-blur rounded-2xl border border-blue-100 px-6 py-4 mt-2 mb-2 shadow-inner",
+      className
+    )}>{children}</div>
   </AccordionPrimitive.Content>
 ))
 

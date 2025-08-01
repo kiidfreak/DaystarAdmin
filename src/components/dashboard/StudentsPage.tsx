@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Users, 
   Search, 
@@ -128,21 +130,21 @@ export const StudentsPage: React.FC = () => {
 
   const getStatusBadge = (attendanceRate: number) => {
     if (attendanceRate >= 90) {
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Excellent</Badge>;
+      return <Badge className="bg-green-100 text-green-700 border-green-200">Excellent</Badge>;
     } else if (attendanceRate >= 70) {
-      return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Good</Badge>;
+      return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Good</Badge>;
     } else if (attendanceRate >= 50) {
-      return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Fair</Badge>;
+      return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">Fair</Badge>;
     } else {
-      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Poor</Badge>;
+      return <Badge className="bg-red-100 text-red-700 border-red-200">Poor</Badge>;
     }
   };
 
   const getAttendanceRateColor = (rate: number) => {
-    if (rate >= 90) return 'text-green-400';
-    if (rate >= 70) return 'text-blue-400';
-    if (rate >= 50) return 'text-yellow-400';
-    return 'text-red-400';
+    if (rate >= 90) return 'text-green-600';
+    if (rate >= 70) return 'text-blue-600';
+    if (rate >= 50) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   if (isLoading) {
@@ -151,10 +153,10 @@ export const StudentsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="glass-card p-12 text-center">
-        <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-white mb-2">Error Loading Students</h3>
-        <p className="text-gray-400">Please try again later</p>
+      <div className="professional-card p-12 text-center">
+        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Students</h3>
+        <p className="text-gray-600">Please try again later</p>
       </div>
     );
   }
@@ -168,156 +170,158 @@ export const StudentsPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">All Students</h2>
-          <p className="text-gray-400">Manage and view all registered students</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">All Students</h2>
+          <p className="text-gray-600 text-lg">Manage and view all registered students</p>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-bold text-white">{totalStudents}</div>
-          <div className="text-gray-400 text-sm">Total Students</div>
+          <div className="text-2xl font-bold text-gray-900">{totalStudents}</div>
+          <div className="text-gray-600 text-sm">Total Students</div>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6">
+        <div className="professional-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold text-white">{totalStudents}</div>
-              <div className="text-gray-400 text-sm">Total Students</div>
+              <div className="text-2xl font-bold text-gray-900">{totalStudents}</div>
+              <div className="text-gray-600 text-sm">Total Students</div>
             </div>
-            <Users className="w-8 h-8 text-blue-400" />
+            <Users className="w-8 h-8 text-blue-600" />
           </div>
         </div>
         
-        <div className="glass-card p-6">
+        <div className="professional-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold text-green-400">{activeStudents}</div>
-              <div className="text-gray-400 text-sm">Active Students</div>
+              <div className="text-2xl font-bold text-green-600">{activeStudents}</div>
+              <div className="text-gray-600 text-sm">Active Students</div>
             </div>
-            <CheckCircle className="w-8 h-8 text-green-400" />
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
         </div>
         
-        <div className="glass-card p-6">
+        <div className="professional-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold text-red-400">{inactiveStudents}</div>
-              <div className="text-gray-400 text-sm">Inactive Students</div>
+              <div className="text-2xl font-bold text-red-600">{inactiveStudents}</div>
+              <div className="text-gray-600 text-sm">Inactive Students</div>
             </div>
-            <XCircle className="w-8 h-8 text-red-400" />
+            <XCircle className="w-8 h-8 text-red-600" />
           </div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="glass-card p-6">
+      <div className="professional-card p-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <Input
               type="text"
               placeholder="Search students by name, email, or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full pl-10 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20"
+              className="pl-10 h-12 text-base"
             />
           </div>
           
-          <div className="flex gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20 bg-gray-800 text-gray-900 font-medium"
-            >
-              <option value="all" className="bg-gray-800 text-gray-900">All Status</option>
-              <option value="active" className="bg-gray-800 text-gray-900">Active</option>
-              <option value="inactive" className="bg-gray-800 text-gray-900">Inactive</option>
-            </select>
+          <div className="flex gap-3">
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-40 h-12 text-base">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
             
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#001F3F] focus:ring-2 focus:ring-[#001F3F]/20 bg-gray-800 text-gray-900 font-medium"
-            >
-              <option value="all" className="bg-gray-800 text-gray-900">All Departments</option>
-              {departments.map(dept => (
-                <option key={dept} value={dept} className="bg-gray-800 text-gray-900">{dept}</option>
-              ))}
-            </select>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-48 h-12 text-base">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
 
       {/* Students Table */}
-      <div className="glass-card overflow-hidden">
-        <div className="p-6 border-b border-white/10">
-          <h3 className="text-xl font-semibold text-white">Student Directory</h3>
-          <p className="text-gray-400 text-sm mt-1">
+      <div className="professional-card overflow-hidden">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-xl font-semibold text-gray-900">Student Directory</h3>
+          <p className="text-gray-600 text-sm mt-1">
             Showing {paginatedStudents.length} of {filteredStudents.length} students
           </p>
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white/5">
+          <table className="professional-table">
+            <thead>
               <tr>
-                <th className="text-left p-4 text-gray-400 font-medium">Student</th>
-                <th className="text-left p-4 text-gray-400 font-medium">Contact</th>
-                <th className="text-left p-4 text-gray-400 font-medium">Department</th>
-                <th className="text-left p-4 text-gray-400 font-medium">Attendance</th>
-                <th className="text-left p-4 text-gray-400 font-medium">Status</th>
-                <th className="text-left p-4 text-gray-400 font-medium">Last Attendance</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Student</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Contact</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Department</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Attendance</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Status</th>
+                <th className="text-left py-4 px-6 text-gray-700 font-semibold">Last Attendance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody>
               {paginatedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-400">
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
                     <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
                     <p>No students found matching your criteria</p>
                   </td>
                 </tr>
               ) : (
                 paginatedStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-blue-50 transition-colors">
-                    <td className="p-4">
+                  <tr key={student.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-4 px-6">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center">
                           <User className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                          <div className="text-white font-medium">{student.full_name}</div>
-                          <div className="text-gray-400 text-sm">ID: {student.student_id}</div>
+                          <div className="text-gray-900 font-medium">{student.full_name}</div>
+                          <div className="text-gray-600 text-sm">ID: {student.student_id}</div>
                         </div>
                       </div>
                     </td>
                     
-                    <td className="p-4">
+                    <td className="py-4 px-6">
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2">
-                          <Mail className="w-4 h-4 text-gray-400" />
-                          <span className="text-white text-sm">{student.email}</span>
+                          <Mail className="w-4 h-4 text-gray-500" />
+                          <span className="text-gray-900 text-sm">{student.email}</span>
                         </div>
                         {student.phone && (
                           <div className="flex items-center space-x-2">
-                            <Phone className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-400 text-sm">{student.phone}</span>
+                            <Phone className="w-4 h-4 text-gray-500" />
+                            <span className="text-gray-600 text-sm">{student.phone}</span>
                           </div>
                         )}
                       </div>
                     </td>
                     
-                    <td className="p-4">
+                    <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
-                        <Building className="w-4 h-4 text-gray-400" />
-                        <span className="text-white">{student.department || 'Not specified'}</span>
+                        <Building className="w-4 h-4 text-gray-500" />
+                        <span className="text-gray-900">{student.department || 'Not specified'}</span>
                       </div>
                     </td>
                     
-                    <td className="p-4">
+                    <td className="py-4 px-6">
                       <div className="space-y-1">
-                        <div className="text-white">
+                        <div className="text-gray-900">
                           {student.attendance_stats?.attended_sessions || 0} / {student.attendance_stats?.total_sessions || 0}
                         </div>
                         <div className={`font-medium ${getAttendanceRateColor(student.attendance_stats?.attendance_rate || 0)}`}>
@@ -326,20 +330,20 @@ export const StudentsPage: React.FC = () => {
                       </div>
                     </td>
                     
-                    <td className="p-4">
+                    <td className="py-4 px-6">
                       {getStatusBadge(student.attendance_stats?.attendance_rate || 0)}
                     </td>
                     
-                    <td className="p-4">
+                    <td className="py-4 px-6">
                       {student.attendance_stats?.last_attendance ? (
                         <div className="flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-400 text-sm">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span className="text-gray-600 text-sm">
                             {new Date(student.attendance_stats.last_attendance).toLocaleDateString()}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-sm">Never</span>
+                        <span className="text-gray-500 text-sm">Never</span>
                       )}
                     </td>
                   </tr>
@@ -351,9 +355,9 @@ export const StudentsPage: React.FC = () => {
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="p-6 border-t border-white/10">
+          <div className="p-6 border-t border-gray-200">
             <div className="flex items-center justify-between">
-              <div className="text-gray-400 text-sm">
+              <div className="text-gray-600 text-sm">
                 Page {currentPage} of {totalPages}
               </div>
               <div className="flex space-x-2">
@@ -362,7 +366,7 @@ export const StudentsPage: React.FC = () => {
                   size="sm"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="border-white/20 text-gray-400 hover:text-white"
+                  className="border-gray-300 text-gray-700 hover:text-gray-900"
                 >
                   Previous
                 </Button>
@@ -371,7 +375,7 @@ export const StudentsPage: React.FC = () => {
                   size="sm"
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="border-white/20 text-gray-400 hover:text-white"
+                  className="border-gray-300 text-gray-700 hover:text-gray-900"
                 >
                   Next
                 </Button>

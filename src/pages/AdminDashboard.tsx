@@ -11,6 +11,7 @@ import { StudentCourseAssignment } from '@/components/dashboard/StudentCourseAss
 import { AttendanceAnalytics } from '@/components/dashboard/AttendanceAnalytics';
 import { useUser } from '@/contexts/UserContext';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useUser();
@@ -94,11 +95,43 @@ const AdminDashboard: React.FC = () => {
           <p className="text-gray-400">Course management coming soon</p>
         </div>;
       
-      case 'alerts':
-        return <div className="glass-card p-12 text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">Notifications</h2>
-          <p className="text-gray-400">System alerts and notifications</p>
-        </div>;
+      case 'alerts': {
+        const { notifications } = useRealtimeNotifications();
+        return (
+          <div className="glass-card p-12 max-w-xl mx-auto mt-12">
+            <h2 className="text-2xl font-bold text-white mb-6">Notifications</h2>
+            {notifications.length === 0 ? (
+              <div className="text-center py-12">
+                <span className="block text-5xl mb-4">🔔</span>
+                <p className="text-gray-400">No notifications yet</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`rounded-xl p-4 shadow border-l-4 ${
+                      notification.type === 'success'
+                        ? 'border-green-500 bg-green-50'
+                        : notification.type === 'warning'
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : notification.type === 'error'
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-blue-500 bg-blue-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-lg text-gray-900">{notification.title}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{notification.timestamp.toLocaleTimeString()}</span>
+                    </div>
+                    <div className="text-gray-700 text-sm">{notification.message}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
       
       default:
         return (

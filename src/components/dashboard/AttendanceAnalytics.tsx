@@ -135,16 +135,16 @@ export const AttendanceAnalytics: React.FC<AttendanceAnalyticsProps> = ({ userRo
   }
 
   return (
-    <Card className="glass-card">
+    <Card className="bg-white shadow-xl rounded-2xl p-6">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <Calendar className="w-6 h-6 text-blue-600" />
             Attendance Analytics
             {isConnected && (
               <div className="flex items-center space-x-2 ml-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-400">Live</span>
+                <span className="text-xs text-green-500 font-semibold">Live</span>
               </div>
             )}
           </CardTitle>
@@ -152,24 +152,24 @@ export const AttendanceAnalytics: React.FC<AttendanceAnalyticsProps> = ({ userRo
           <div className="flex items-center gap-4 mt-6">
             <Button
               onClick={() => handleExport('csv')}
-              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 text-base shadow"
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-5 h-5" />
               Export CSV
             </Button>
             <Button
               onClick={() => handleExport('excel')}
-              className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700"
+              className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 flex items-center gap-2 text-base shadow"
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-5 h-5" />
               Export Excel
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8">
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300">Date</label>
             <Input
@@ -263,139 +263,137 @@ export const AttendanceAnalytics: React.FC<AttendanceAnalyticsProps> = ({ userRo
         </div>
 
         {/* Analytics Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <Card className="bg-blue-500/10 border-blue-500/20">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-6">
+          <Card className="bg-blue-50 border-blue-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-400" />
-                <span className="text-sm text-gray-300">Total</span>
+                <Users className="w-5 h-5 text-blue-500" />
+                <span className="text-base text-gray-700 font-semibold">Total</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.total}</p>
+              <p className="text-3xl font-extrabold text-blue-900">{analytics.total}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-green-500/10 border-green-500/20">
+          <Card className="bg-green-50 border-green-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-green-400" />
-                <span className="text-sm text-gray-300">Present</span>
+                <Clock className="w-5 h-5 text-green-500" />
+                <span className="text-base text-gray-700 font-semibold">Present</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.verified}</p>
+              <p className="text-3xl font-extrabold text-green-900">{analytics.verified}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-yellow-500/10 border-yellow-500/20">
+          <Card className="bg-yellow-50 border-yellow-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm text-gray-300">Pending</span>
+                <Clock className="w-5 h-5 text-yellow-500" />
+                <span className="text-base text-gray-700 font-semibold">Pending</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.pending}</p>
+              <p className="text-3xl font-extrabold text-yellow-900">{analytics.pending}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-red-500/10 border-red-500/20">
+          <Card className="bg-red-50 border-red-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-red-400" />
-                <span className="text-sm text-gray-300">Absent</span>
+                <Clock className="w-5 h-5 text-red-500" />
+                <span className="text-base text-gray-700 font-semibold">Absent</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.absent}</p>
+              <p className="text-3xl font-extrabold text-red-900">{analytics.absent}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-purple-500/10 border-purple-500/20">
+          <Card className="bg-purple-50 border-purple-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-purple-400" />
-                <span className="text-sm text-gray-300">BLE</span>
+                <MapPin className="w-5 h-5 text-purple-500" />
+                <span className="text-base text-gray-700 font-semibold">BLE</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.bleCount}</p>
+              <p className="text-3xl font-extrabold text-purple-900">{analytics.bleCount}</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-orange-500/10 border-orange-500/20">
+          <Card className="bg-orange-50 border-orange-200 shadow rounded-xl">
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-orange-400" />
-                <span className="text-sm text-gray-300">QR</span>
+                <Calendar className="w-5 h-5 text-orange-500" />
+                <span className="text-base text-gray-700 font-semibold">QR</span>
               </div>
-              <p className="text-2xl font-bold text-white">{analytics.qrCount}</p>
+              <p className="text-3xl font-extrabold text-orange-900">{analytics.qrCount}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Attendance Table */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Attendance Records</h3>
-            <Badge variant="outline" className="text-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xl font-bold text-gray-900">Attendance Records</h3>
+            <Badge variant="outline" className="text-base font-semibold bg-gray-100 text-gray-700 border-gray-300 rounded-lg px-3 py-1">
               {filteredAttendance.length} records
             </Badge>
           </div>
           
-          <div className="border border-gray-700 rounded-lg overflow-hidden">
+          <div className="border border-gray-200 rounded-2xl overflow-hidden shadow">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-800/50">
-                  <TableHead className="text-gray-300">Student</TableHead>
-                  <TableHead className="text-gray-300">Course</TableHead>
-                  <TableHead className="text-gray-300">Check-in</TableHead>
-                  <TableHead className="text-gray-300">Method</TableHead>
-                  <TableHead className="text-gray-300">Status</TableHead>
-                  <TableHead className="text-gray-300">Beacon</TableHead>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Student</TableHead>
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Course</TableHead>
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Check-in</TableHead>
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Method</TableHead>
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Status</TableHead>
+                  <TableHead className="text-gray-700 font-bold text-base py-3 px-4">Beacon</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAttendance.map((record) => (
-                  <TableRow key={record.id} className="hover:bg-gray-800/30">
-                    <TableCell>
+                {filteredAttendance.map((record, idx) => (
+                  <TableRow key={record.id} className={`transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50`}>
+                    <TableCell className="py-3 px-4">
                       <div>
-                        <p className="font-medium text-white">{record.users?.full_name || 'Unknown'}</p>
-                        <p className="text-sm text-gray-400">{record.users?.email || record.student_id}</p>
+                        <p className="font-semibold text-gray-900 text-lg">{record.users?.full_name || 'Unknown'}</p>
+                        <p className="text-sm text-gray-500">{record.users?.email || record.student_id}</p>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                    <TableCell className="py-3 px-4">
+                      <Badge variant="outline" className="text-xs bg-blue-100 text-blue-700 border-blue-200 rounded-lg px-2 py-1">
                         {record.course_code || 'N/A'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <p className="text-white">
-                          {record.check_in_time ? new Date(record.check_in_time).toLocaleTimeString() : 'N/A'}
-                        </p>
-                        {record.check_out_time && (
-                          <p className="text-gray-400">
-                            Out: {new Date(record.check_out_time).toLocaleTimeString()}
-                          </p>
-                        )}
+                    <TableCell className="py-3 px-4">
+                      <div className="text-base text-gray-900">
+                        {record.check_in_time ? new Date(record.check_in_time).toLocaleTimeString() : 'N/A'}
                       </div>
+                      {record.check_out_time && (
+                        <div className="text-xs text-gray-400">
+                          Out: {new Date(record.check_out_time).toLocaleTimeString()}
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3 px-4">
                       <Badge 
-                        className={`text-xs ${
-                          record.method === 'BLE' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                          record.method === 'QR' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                          'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                        className={`text-xs rounded-full px-3 py-1 font-semibold ${
+                          record.method === 'BLE' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                          record.method === 'QR' ? 'bg-green-100 text-green-700 border-green-200' :
+                          'bg-gray-100 text-gray-500 border-gray-200'
                         }`}
                       >
                         {record.method || 'Unknown'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3 px-4">
                       <Badge 
-                        className={`text-xs ${
-                          record.status === 'verified' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                          record.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                          'bg-red-500/20 text-red-400 border-red-500/30'
+                        className={`text-xs rounded-full px-3 py-1 font-semibold ${
+                          record.status === 'verified' ? 'bg-green-100 text-green-700 border-green-200' :
+                          record.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                          'bg-red-100 text-red-700 border-red-200'
                         }`}
                       >
                         {record.status || 'Unknown'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-gray-400">
+                    <TableCell className="py-3 px-4">
+                      <span className="text-xs text-gray-500">
                         {record.beacon_id || record.beacon_mac_address || 'N/A'}
                       </span>
                     </TableCell>

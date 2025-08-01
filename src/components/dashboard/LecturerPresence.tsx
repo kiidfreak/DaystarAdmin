@@ -47,40 +47,52 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['lecturer-sessions', userId],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      
-      let query = supabase
-        .from('class_sessions')
-        .select(`
-          *,
-          courses:course_code(name),
-          users:lecturer_id(full_name, email)
-        `)
-        .eq('session_date', today);
+      try {
+        console.log('Fetching lecturer sessions with params:', { userId, userRole });
+        const today = new Date().toISOString().split('T')[0];
+        
+        let query = supabase
+          .from('class_sessions')
+          .select(`
+            *,
+            courses:course_code(name),
+            users:lecturer_id(full_name, email)
+          `)
+          .eq('session_date', today);
 
-      if (userRole === 'lecturer' && userId) {
-        query = query.eq('lecturer_id', userId);
+        if (userRole === 'lecturer' && userId) {
+          query = query.eq('lecturer_id', userId);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+        
+        const result = (data || []).map(session => ({
+          id: session.id,
+          lecturer_id: session.lecturer_id,
+          lecturer_name: session.users?.full_name || 'Unknown',
+          lecturer_email: session.users?.email || 'Unknown',
+          course_code: session.course_code,
+          course_name: session.courses?.name || 'Unknown',
+          session_date: session.session_date,
+          start_time: session.start_time,
+          end_time: session.end_time,
+          status: session.status || 'scheduled',
+          sign_in_time: session.sign_in_time,
+          sign_out_time: session.sign_out_time,
+          location: session.location
+        }));
+        
+        console.log('Lecturer sessions result:', result);
+        return result;
+      } catch (error) {
+        console.error('Error fetching lecturer sessions:', error);
+        throw error;
       }
-
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      return (data || []).map(session => ({
-        id: session.id,
-        lecturer_id: session.lecturer_id,
-        lecturer_name: session.users?.full_name || 'Unknown',
-        lecturer_email: session.users?.email || 'Unknown',
-        course_code: session.course_code,
-        course_name: session.courses?.name || 'Unknown',
-        session_date: session.session_date,
-        start_time: session.start_time,
-        end_time: session.end_time,
-        status: session.status || 'scheduled',
-        sign_in_time: session.sign_in_time,
-        sign_out_time: session.sign_out_time,
-        location: session.location
-      }));
     },
     enabled: !!userId || userRole === 'admin',
   });
@@ -165,13 +177,13 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Scheduled</Badge>;
+        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Scheduled</Badge>;
       case 'active':
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">🟢 Active</Badge>;
+        return <Badge className="bg-green-100 text-green-700 border-green-200">🟢 Active</Badge>;
       case 'ended':
-        return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Ended</Badge>;
+        return <Badge className="bg-gray-100 text-gray-700 border-gray-200">Ended</Badge>;
       case 'cancelled':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Cancelled</Badge>;
+        return <Badge className="bg-red-100 text-red-700 border-red-200">Cancelled</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -181,22 +193,22 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
     if (session.status === 'active') {
       return (
         <div className="flex items-center space-x-2">
-          <CheckCircle className="w-4 h-4 text-green-400" />
-          <span className="text-green-400 text-sm">Lecturer Present ✅</span>
+          <CheckCircle className="w-4 h-4 text-green-600" />
+          <span className="text-green-700 text-sm font-medium">Lecturer Present ✅</span>
         </div>
       );
     } else if (session.status === 'ended') {
       return (
         <div className="flex items-center space-x-2">
-          <XCircle className="w-4 h-4 text-gray-400" />
-          <span className="text-gray-400 text-sm">Session Ended</span>
+          <XCircle className="w-4 h-4 text-gray-600" />
+          <span className="text-gray-700 text-sm font-medium">Session Ended</span>
         </div>
       );
     } else {
       return (
         <div className="flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-yellow-400" />
-          <span className="text-yellow-400 text-sm">Lecturer Not Signed In ❌</span>
+          <AlertCircle className="w-4 h-4 text-yellow-600" />
+          <span className="text-yellow-700 text-sm font-medium">Lecturer Not Signed In ❌</span>
         </div>
       );
     }
@@ -208,19 +220,19 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
 
   return (
     <div className="space-y-6">
-      <Card className="glass-card">
+      <Card className="professional-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <User className="w-5 h-5 text-blue-400" />
+          <CardTitle className="flex items-center gap-2 text-gray-900">
+            <User className="w-5 h-5 text-blue-600" />
             Lecturer Presence Tracking
             {isConnected && (
               <div className="flex items-center space-x-2 ml-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-xs text-green-400">Live</span>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-green-600 font-medium">Live</span>
               </div>
             )}
           </CardTitle>
-          <p className="text-gray-300">
+          <p className="text-gray-600">
             Track lecturer attendance and manage session status
           </p>
         </CardHeader>
@@ -228,42 +240,42 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
           {/* Filters */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white">Search</label>
+              <label className="text-sm font-semibold text-gray-700">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <Input
                   placeholder="Search by lecturer or course..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-400 focus:ring-blue-400/20"
+                  className="pl-10 h-12 text-base"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white">Status</label>
+              <label className="text-sm font-semibold text-gray-700">Status</label>
               <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="all" className="text-white hover:bg-gray-700">All Status</SelectItem>
-                  <SelectItem value="scheduled" className="text-white hover:bg-gray-700">Scheduled</SelectItem>
-                  <SelectItem value="active" className="text-white hover:bg-gray-700">Active</SelectItem>
-                  <SelectItem value="ended" className="text-white hover:bg-gray-700">Ended</SelectItem>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="ended">Ended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-white">Actions</label>
+              <label className="text-sm font-semibold text-gray-700">Actions</label>
               <Button
                 variant="outline"
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('all');
                 }}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+                className="w-full h-12 text-base"
               >
                 Clear Filters
               </Button>
@@ -272,47 +284,47 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
 
           {/* Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20 transition-colors">
+            <Card className="professional-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm text-white">Total Sessions</span>
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-gray-700 font-medium">Total Sessions</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{sessions?.length || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{sessions?.length || 0}</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-green-500/10 border-green-500/20 hover:bg-green-500/20 transition-colors">
+            <Card className="professional-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-400" />
-                  <span className="text-sm text-white">Active Sessions</span>
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-gray-700 font-medium">Active Sessions</span>
                 </div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-gray-900">
                   {sessions?.filter(s => s.status === 'active').length || 0}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20 transition-colors">
+            <Card className="professional-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-yellow-400" />
-                  <span className="text-sm text-white">Scheduled</span>
+                  <AlertCircle className="w-4 h-4 text-yellow-600" />
+                  <span className="text-sm text-gray-700 font-medium">Scheduled</span>
                 </div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-gray-900">
                   {sessions?.filter(s => s.status === 'scheduled').length || 0}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-red-500/10 border-red-500/20 hover:bg-red-500/20 transition-colors">
+            <Card className="professional-card">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
-                  <XCircle className="w-4 h-4 text-red-400" />
-                  <span className="text-sm text-white">Ended Sessions</span>
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-sm text-gray-700 font-medium">Ended Sessions</span>
                 </div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-gray-900">
                   {sessions?.filter(s => s.status === 'ended').length || 0}
                 </p>
               </CardContent>
@@ -322,51 +334,51 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
           {/* Sessions Table */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Today's Sessions</h3>
-              <Badge variant="outline" className="text-sm bg-white/10 text-white border-white/20">
+              <h3 className="text-xl font-semibold text-gray-900">Today's Sessions</h3>
+              <Badge variant="outline" className="text-sm bg-gray-100 text-gray-700 border-gray-200">
                 {filteredSessions.length} sessions
               </Badge>
             </div>
             
-            <div className="border border-gray-700 rounded-lg overflow-hidden bg-white/5">
+            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-800/50">
-                    <TableHead className="text-white font-medium">Lecturer</TableHead>
-                    <TableHead className="text-white font-medium">Course</TableHead>
-                    <TableHead className="text-white font-medium">Time</TableHead>
-                    <TableHead className="text-white font-medium">Status</TableHead>
-                    <TableHead className="text-white font-medium">Presence</TableHead>
-                    <TableHead className="text-white font-medium">Actions</TableHead>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-gray-700 font-semibold">Lecturer</TableHead>
+                    <TableHead className="text-gray-700 font-semibold">Course</TableHead>
+                    <TableHead className="text-gray-700 font-semibold">Time</TableHead>
+                    <TableHead className="text-gray-700 font-semibold">Status</TableHead>
+                    <TableHead className="text-gray-700 font-semibold">Presence</TableHead>
+                    <TableHead className="text-gray-700 font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredSessions.map((session) => (
-                    <TableRow key={session.id} className="hover:bg-blue-50 transition-colors">
+                    <TableRow key={session.id} className="hover:bg-gray-50 transition-colors">
                       <TableCell>
                         <div>
-                          <p className="font-medium text-white">{session.lecturer_name}</p>
-                          <p className="text-sm text-gray-300">{session.lecturer_email}</p>
+                          <p className="font-medium text-gray-900">{session.lecturer_name}</p>
+                          <p className="text-sm text-gray-600">{session.lecturer_email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-white">{session.course_name}</p>
-                          <p className="text-sm text-gray-300">{session.course_code}</p>
+                          <p className="font-medium text-gray-900">{session.course_name}</p>
+                          <p className="text-sm text-gray-600">{session.course_code}</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <p className="text-white">
+                          <p className="text-gray-900">
                             {session.start_time} - {session.end_time}
                           </p>
                           {session.sign_in_time && (
-                            <p className="text-green-400">
+                            <p className="text-green-600">
                               In: {new Date(session.sign_in_time).toLocaleTimeString()}
                             </p>
                           )}
                           {session.sign_out_time && (
-                            <p className="text-red-400">
+                            <p className="text-red-600">
                               Out: {new Date(session.sign_out_time).toLocaleTimeString()}
                             </p>
                           )}
@@ -385,7 +397,7 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
                               size="sm"
                               onClick={() => handleSignIn(session.id)}
                               disabled={signInMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700 text-white border-green-600 hover:border-green-700"
+                              className="bg-green-600 hover:bg-green-700 text-white"
                             >
                               <LogIn className="w-4 h-4 mr-1" />
                               Sign In
@@ -396,7 +408,7 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
                               size="sm"
                               onClick={() => handleSignOut(session.id)}
                               disabled={signOutMutation.isPending}
-                              className="bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                              className="bg-red-600 hover:bg-red-700 text-white"
                             >
                               <LogOut className="w-4 h-4 mr-1" />
                               Sign Out

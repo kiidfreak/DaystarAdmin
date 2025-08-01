@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
+import { Shield, UserPlus } from 'lucide-react';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string, role: string) => void;
@@ -13,28 +15,107 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
   const { toast } = useToast();
+
+  // Temporary function to create admin account
+  const createAdminAccount = async () => {
+    setIsCreatingAdmin(true);
+    try {
+      // First check if admin already exists
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', 'admin@tallycheck.com')
+        .limit(1);
+
+      if (checkError) {
+        throw new Error(`Failed to check existing users: ${checkError.message}`);
+      }
+
+      if (existingUsers && existingUsers.length > 0) {
+        toast({
+          title: "Admin Already Exists",
+          description: "Admin account already exists. Use admin@tallycheck.com / Admin123! to login.",
+        });
+        return;
+      }
+
+      // Create user profile in users table first (without auth)
+      const { data: profileData, error: profileError } = await supabase
+        .from('users')
+        .insert([{
+          full_name: 'System Administrator',
+          email: 'admin@tallycheck.com',
+          role: 'admin',
+          department: 'Administration',
+          phone: '',
+          office_location: ''
+        }])
+        .select()
+        .single();
+
+      if (profileError) {
+        throw new Error(`Profile creation failed: ${profileError.message}`);
+      }
+
+      toast({
+        title: "✅ Admin Account Created!",
+        description: "Admin profile created. You can now login with admin@tallycheck.com / Admin123!",
+      });
+
+      // Auto-fill the form
+      setEmail('admin@tallycheck.com');
+      setPassword('Admin123!');
+
+    } catch (error) {
+      console.error('Admin creation error:', error);
+      toast({
+        title: "❌ Admin Creation Failed",
+        description: error instanceof Error ? error.message : "Failed to create admin account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Demo role detection based on email
-    let role = 'lecturer';
-    if (email.includes('admin')) role = 'admin';
-
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      onLogin(email, password, role);
+      // First try to get user profile directly
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw new Error('User not found. Please create an admin account first.');
+      }
+
+      if (!userProfile) {
+        throw new Error('User profile not found');
+      }
+
+      // For now, bypass auth and directly login with profile
+      // This is a temporary solution until we can set up proper auth
+      // Allow any user that exists in the database to log in
+      // In the future, we'll implement proper password validation
+      onLogin(email, password, userProfile.role);
+      
       toast({
         title: "Login Successful",
-        description: `Welcome to Tally Check ${role} dashboard`,
+        description: `Welcome to Tally Check ${userProfile.role} dashboard`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: "Please check your credentials",
+        description: error instanceof Error ? error.message : "Please check your credentials",
         variant: "destructive",
       });
     } finally {
@@ -146,14 +227,33 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
               </Button>
             </form>
 
-            <div className="mt-8 text-center">
-              <p className="text-sm text-gray-600 mb-4">
-                Demo accounts for testing:
+            {/* Temporary Admin Creation Button */}
+            <div className="mt-6">
+              <Button
+                type="button"
+                onClick={createAdminAccount}
+                disabled={isCreatingAdmin}
+                variant="outline"
+                className="w-full h-12 border-2 border-green-200 text-green-600 hover:bg-green-50 font-medium rounded-xl transition-all duration-300"
+              >
+                {isCreatingAdmin ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Creating Admin Account...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5" />
+                    <span>Create Admin Account</span>
+                  </div>
+                )}
+              </Button>
+            </div>
+
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">
+                First time setup? Click "Create Admin Account" above to create the default admin account.
               </p>
-              <div className="space-y-2 text-xs text-gray-500">
-                <p>• <span className="font-semibold">lecturer@uni.edu</span> - Lecturer Dashboard</p>
-                <p>• <span className="font-semibold">admin@uni.edu</span> - Admin Dashboard</p>
-              </div>
             </div>
           </Card>
         </div>

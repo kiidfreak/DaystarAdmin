@@ -4,7 +4,7 @@ import { LucideIcon } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
-  value: string | number;
+  value: string | number | React.ReactNode;
   change?: string;
   icon: LucideIcon;
   trend?: 'up' | 'down' | 'neutral';
@@ -20,34 +20,54 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   color = 'blue'
 }) => {
   const colorClasses = {
-    blue: 'text-sky-blue bg-sky-blue/20 border-sky-blue/30',
-    green: 'text-green-400 bg-green-500/20 border-green-500/30',
-    yellow: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
-    red: 'text-red-400 bg-red-500/20 border-red-500/30'
+    blue: 'text-blue-600 bg-blue-100 border-blue-200',
+    green: 'text-green-600 bg-green-100 border-green-200',
+    yellow: 'text-yellow-600 bg-yellow-100 border-yellow-200',
+    red: 'text-red-600 bg-red-100 border-red-200'
   };
 
   const trendColor = {
-    up: 'text-green-400',
-    down: 'text-red-400',
-    neutral: 'text-gray-400'
+    up: 'text-green-600',
+    down: 'text-red-600',
+    neutral: 'text-gray-500'
+  };
+
+  const getTrendIcon = () => {
+    switch (trend) {
+      case 'up':
+        return '↗';
+      case 'down':
+        return '↘';
+      default:
+        return '';
+    }
   };
 
   return (
-    <div className="metric-card">
+    <div className="professional-card p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg">
       <div className="flex items-start justify-between mb-4">
-        <div className={`p-3 rounded-2xl border ${colorClasses[color]}`}>
+        <div className={`p-3 rounded-xl border ${colorClasses[color]} shadow-sm`}>
           <Icon className="w-6 h-6" />
         </div>
         {change && (
-          <span className={`text-sm font-medium ${trendColor[trend]}`}>
-            {trend === 'up' ? '+' : trend === 'down' ? '-' : ''}{change}
-          </span>
+          <div className="flex items-center space-x-1">
+            <span className={`text-sm font-semibold ${trendColor[trend]}`}>
+              {getTrendIcon()}
+            </span>
+            <span className={`text-sm font-semibold ${trendColor[trend]}`}>
+              {change}
+            </span>
+          </div>
         )}
       </div>
       
-      <div>
-        <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
-        <p className="text-gray-400 text-sm">{title}</p>
+      <div className="space-y-2">
+        <div className="text-3xl font-bold text-gray-900 leading-tight">
+          {value}
+        </div>
+        <p className="text-gray-600 font-medium text-sm leading-relaxed">
+          {title}
+        </p>
       </div>
     </div>
   );
