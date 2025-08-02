@@ -108,7 +108,7 @@ export const UserManagement: React.FC = () => {
         description: "Admin profile created: admin@tallycheck.com / Admin123!",
       });
 
-      queryClient.invalidateQueries(['users']);
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (error) {
       console.error('Admin creation error:', error);
       toast({
@@ -438,7 +438,17 @@ export const UserManagement: React.FC = () => {
   };
 
   if (usersLoading || coursesLoading || lecturersLoading) {
-    return <PageLoading text="Loading users..." />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#001F3F] via-[#1E3A5F] to-[#001F3F] p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          <div className="glass-card p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-2xl font-bold text-white mb-2">Loading User Management</h2>
+            <p className="text-gray-400">Please wait while we fetch the latest information...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

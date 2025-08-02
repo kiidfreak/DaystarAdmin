@@ -51,17 +51,45 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
         console.log('Fetching lecturer sessions with params:', { userId, userRole });
         const today = new Date().toISOString().split('T')[0];
         
+        // First, get sessions with course information
         let query = supabase
           .from('class_sessions')
           .select(`
             *,
-            courses:course_code(name),
-            users:lecturer_id(full_name, email)
+            courses!class_sessions_course_id_fkey (
+              id,
+              name,
+              code,
+              instructor_id,
+              users!courses_instructor_id_fkey (
+                id,
+                full_name,
+                email
+              )
+            )
           `)
           .eq('session_date', today);
 
+        // If user is a lecturer, filter by their assigned courses
         if (userRole === 'lecturer' && userId) {
-          query = query.eq('lecturer_id', userId);
+          // Get courses assigned to this lecturer
+          const { data: lecturerCourses, error: coursesError } = await supabase
+            .from('courses')
+            .select('id')
+            .eq('instructor_id', userId);
+          
+          if (coursesError) {
+            console.error('Error fetching lecturer courses:', coursesError);
+            throw coursesError;
+          }
+          
+          const courseIds = lecturerCourses?.map(course => course.id) || [];
+          if (courseIds.length > 0) {
+            query = query.in('course_id', courseIds);
+          } else {
+            // If lecturer has no courses, return empty array
+            return [];
+          }
         }
 
         const { data, error } = await query;
@@ -73,10 +101,10 @@ export const LecturerPresence: React.FC<LecturerPresenceProps> = ({ userRole, us
         
         const result = (data || []).map(session => ({
           id: session.id,
-          lecturer_id: session.lecturer_id,
-          lecturer_name: session.users?.full_name || 'Unknown',
-          lecturer_email: session.users?.email || 'Unknown',
-          course_code: session.course_code,
+          lecturer_id: session.lecturer_id || session.courses?.instructor_id,
+          lecturer_name: session.courses?.users?.full_name || 'Unknown',
+          lecturer_email: session.courses?.users?.email || 'Unknown',
+          course_code: session.courses?.code || 'Unknown',
           course_name: session.courses?.name || 'Unknown',
           session_date: session.session_date,
           start_time: session.start_time,

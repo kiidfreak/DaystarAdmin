@@ -139,18 +139,27 @@ export const DeviceVerification: React.FC = () => {
       try {
         // Try to fetch from database first
         const { data, error } = await supabase
-          .from('device_verification_requests')
+          .from('device_change_requests')
           .select(`
             id,
-            student_id,
-            old_device_id,
+            user_id,
+            current_device_id,
             new_device_id,
-            request_date,
-            status,
             reason,
-            users:student_id (full_name, email)
+            status,
+            requested_at,
+            reviewed_at,
+            reviewed_by,
+            created_at,
+            updated_at,
+            users!device_change_requests_user_id_fkey (
+              id,
+              full_name,
+              email,
+              role
+            )
           `)
-          .order('request_date', { ascending: false });
+          .order('requested_at', { ascending: false });
 
         if (error) {
           console.log('Database error, using mock data:', error);
@@ -159,14 +168,14 @@ export const DeviceVerification: React.FC = () => {
         } else {
           const formatted = (data || []).map((req: any) => ({
             id: req.id,
-            student_id: req.student_id,
+            student_id: req.user_id,
             student_name: req.users?.full_name || 'Unknown',
             student_email: req.users?.email || '',
-            old_device_id: req.old_device_id,
-            new_device_id: req.new_device_id,
-            request_date: req.request_date,
-            status: req.status,
-            reason: req.reason,
+            old_device_id: req.current_device_id || 'Unknown',
+            new_device_id: req.new_device_id || 'Unknown',
+            request_date: req.requested_at,
+            status: req.status || 'pending',
+            reason: req.reason || 'No reason provided',
             device_type: 'Smartphone',
             location: 'Campus'
           }));
@@ -213,9 +222,23 @@ export const DeviceVerification: React.FC = () => {
   const handleApprove = async (requestId: string) => {
     setProcessingRequest(requestId);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update the request in the database
+      const { error } = await supabase
+        .from('device_change_requests')
+        .update({
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: 'admin', // You might want to get this from user context
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
       
+      // Update local state
       setRequests(prev => prev.map(req => 
         req.id === requestId ? { ...req, status: 'approved' as const } : req
       ));
@@ -225,6 +248,7 @@ export const DeviceVerification: React.FC = () => {
         description: "Student's new device has been approved successfully",
       });
     } catch (error) {
+      console.error('Approval error:', error);
       toast({
         title: "❌ Approval Failed",
         description: "Failed to approve device change",
@@ -238,9 +262,24 @@ export const DeviceVerification: React.FC = () => {
   const handleReject = async (requestId: string, reason: string) => {
     setProcessingRequest(requestId);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update the request in the database
+      const { error } = await supabase
+        .from('device_change_requests')
+        .update({
+          status: 'rejected',
+          reason: reason,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: 'admin', // You might want to get this from user context
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
       
+      // Update local state
       setRequests(prev => prev.map(req => 
         req.id === requestId ? { ...req, status: 'rejected' as const, reason } : req
       ));
@@ -252,6 +291,7 @@ export const DeviceVerification: React.FC = () => {
       setRejectReason('');
       setShowRejectDialog(false);
     } catch (error) {
+      console.error('Rejection error:', error);
       toast({
         title: "❌ Rejection Failed",
         description: "Failed to reject device change",

@@ -74,6 +74,10 @@ export interface Database {
           end_time: string | null;
           attendance_window_start: string | null;
           attendance_window_end: string | null;
+          lecturer_id: string | null;
+          sign_in_time: string | null;
+          sign_out_time: string | null;
+          status: string;
         };
         Insert: {
           id?: string;
@@ -86,6 +90,10 @@ export interface Database {
           end_time?: string | null;
           attendance_window_start?: string | null;
           attendance_window_end?: string | null;
+          lecturer_id?: string | null;
+          sign_in_time?: string | null;
+          sign_out_time?: string | null;
+          status?: string;
         };
         Update: {
           id?: string;
@@ -98,6 +106,10 @@ export interface Database {
           end_time?: string | null;
           attendance_window_start?: string | null;
           attendance_window_end?: string | null;
+          lecturer_id?: string | null;
+          sign_in_time?: string | null;
+          sign_out_time?: string | null;
+          status?: string;
         };
       };
       attendance_records: {
@@ -264,6 +276,47 @@ export interface Database {
           timestamp?: number;
           expires_at?: number;
           created_at?: string;
+        };
+      };
+      device_change_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          current_device_id: string | null;
+          new_device_id: string | null;
+          reason: string | null;
+          status: string;
+          requested_at: string;
+          reviewed_at: string | null;
+          reviewed_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          current_device_id?: string | null;
+          new_device_id?: string | null;
+          reason?: string | null;
+          status?: string;
+          requested_at?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          current_device_id?: string | null;
+          new_device_id?: string | null;
+          reason?: string | null;
+          status?: string;
+          requested_at?: string;
+          reviewed_at?: string | null;
+          reviewed_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
       };
     };

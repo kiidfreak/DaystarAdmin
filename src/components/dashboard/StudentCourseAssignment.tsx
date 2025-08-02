@@ -109,13 +109,26 @@ export const StudentCourseAssignment: React.FC = () => {
     },
   });
 
-  // Get student enrollments - simplified to work with existing tables
+  // Get all users for assigned_by lookup
+  const { data: allUsers } = useQuery({
+    queryKey: ['all-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .order('full_name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Get student enrollments - try both table names for compatibility
   const { data: enrollments, isLoading: enrollmentsLoading } = useQuery({
     queryKey: ['student-enrollments'],
     queryFn: async () => {
       try {
-        // Try to get enrollments from student_course_enrollments table
-        const { data, error } = await supabase
+        // First try student_course_enrollments table (preferred)
+        let { data, error } = await supabase
           .from('student_course_enrollments')
           .select(`
             *,
@@ -131,37 +144,63 @@ export const StudentCourseAssignment: React.FC = () => {
             )
           `);
         
+        // If that fails, try course_enrollments table (fallback)
         if (error) {
-          console.error('Error fetching enrollments:', error);
-          return [];
+          console.log('student_course_enrollments table not found, trying course_enrollments...');
+          const result = await supabase
+            .from('course_enrollments')
+            .select(`
+              *,
+              users!course_enrollments_student_id_fkey (
+                id,
+                full_name,
+                email
+              ),
+              courses!course_enrollments_course_id_fkey (
+                id,
+                name,
+                code
+              )
+            `);
+          
+          if (result.error) {
+            console.error('Error fetching enrollments from both tables:', result.error);
+            return [];
+          }
+          
+          data = result.data;
         }
         
         // Transform data to match expected format
-        return data?.map(enrollment => ({
-          enrollment_id: enrollment.id,
-          student_id: enrollment.student_id,
-          student_name: enrollment.users?.full_name || 'Unknown',
-          student_email: enrollment.users?.email || '',
-          student_number: '', // student_number column doesn't exist in users table
-          student_department: 'General',
-          course_id: enrollment.course_id,
-          course_name: enrollment.courses?.name || 'Unknown Course',
-          course_code: enrollment.courses?.code || '',
-          instructor_id: null,
-          instructor_name: null,
-          enrollment_status: enrollment.status || 'active',
-          enrollment_date: enrollment.created_at || new Date().toISOString(),
-          assigned_by: enrollment.assigned_by,
-          assigned_by_name: null,
-          assigned_at: enrollment.created_at || new Date().toISOString(),
-          notes: enrollment.notes
-        })) || [];
-      } catch (error) {
-        console.error('Error in enrollments query:', error);
-        return [];
-      }
-    },
-  });
+        return data?.map(enrollment => {
+          const assignedByUser = allUsers?.find(u => u.id === enrollment.assigned_by);
+          return {
+            enrollment_id: enrollment.id || `${enrollment.student_id}-${enrollment.course_id}`,
+            student_id: enrollment.student_id,
+            student_name: enrollment.users?.full_name || 'Unknown',
+            student_email: enrollment.users?.email || '',
+            student_number: '', // student_number column doesn't exist in users table
+            student_department: 'General',
+            course_id: enrollment.course_id,
+            course_name: enrollment.courses?.name || 'Unknown Course',
+            course_code: enrollment.courses?.code || '',
+            instructor_id: null,
+            instructor_name: null,
+            enrollment_status: enrollment.status || 'active',
+            enrollment_date: enrollment.enrollment_date || enrollment.created_at || new Date().toISOString(),
+            assigned_by: enrollment.assigned_by,
+            assigned_by_name: assignedByUser?.full_name || null,
+            assigned_at: enrollment.assigned_at || enrollment.created_at || new Date().toISOString(),
+            notes: enrollment.notes || null
+          };
+        }) || [];
+              } catch (error) {
+          console.error('Error in enrollments query:', error);
+          return [];
+        }
+      },
+      enabled: !!allUsers, // Only run when allUsers is loaded
+    });
 
   // Get course assignment stats - simplified
   const { data: assignmentStats, isLoading: statsLoading } = useQuery({
@@ -186,6 +225,13 @@ export const StudentCourseAssignment: React.FC = () => {
     enabled: !!courses && !!enrollments, // Only run when courses and enrollments are loaded
   });
 
+  // Filter course assignment stats based on search term
+  const filteredAssignmentStats = assignmentStats?.filter(stat => {
+    if (!searchTerm) return true;
+    return stat.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           stat.course_code.toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
+
   // Assign courses to student
   const assignCourses = useMutation({
     mutationFn: async ({ studentId, courseIds, notes }: { 
@@ -197,16 +243,33 @@ export const StudentCourseAssignment: React.FC = () => {
         student_id: studentId,
         course_id: courseId,
         assigned_by: user?.id,
-        status: 'active',
-        notes: notes || 'Assigned by admin'
+        status: 'active' as const, // Ensure valid status
+        notes: notes || 'Assigned by admin',
+        enrollment_date: new Date().toISOString(),
+        assigned_at: new Date().toISOString()
       }));
 
-      const { data, error } = await supabase
+      // Try student_course_enrollments table first
+      let { data, error } = await supabase
         .from('student_course_enrollments')
         .insert(assignments)
         .select();
       
-      if (error) throw error;
+      // If that fails, try course_enrollments table
+      if (error) {
+        console.log('student_course_enrollments table not found, trying course_enrollments...');
+        const result = await supabase
+          .from('course_enrollments')
+          .insert(assignments.map(({ assigned_by, status, notes, enrollment_date, assigned_at, ...rest }) => rest))
+          .select();
+        
+        if (result.error) {
+          throw result.error;
+        }
+        
+        data = result.data;
+      }
+      
       return data;
     },
     onSuccess: () => {
@@ -233,14 +296,35 @@ export const StudentCourseAssignment: React.FC = () => {
   // Update enrollment status
   const updateEnrollmentStatus = useMutation({
     mutationFn: async ({ enrollmentId, status }: { enrollmentId: string; status: string }) => {
-      const { data, error } = await supabase
+      // Validate status to ensure it's one of the allowed values
+      const validStatuses = ['active', 'inactive', 'pending'];
+      const validStatus = validStatuses.includes(status) ? status : 'pending';
+      
+      // Try student_course_enrollments table first
+      let { data, error } = await supabase
         .from('student_course_enrollments')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ status: validStatus, updated_at: new Date().toISOString() })
         .eq('id', enrollmentId)
         .select()
         .single();
       
-      if (error) throw error;
+      // If that fails, try course_enrollments table
+      if (error) {
+        console.log('student_course_enrollments table not found, trying course_enrollments...');
+        const result = await supabase
+          .from('course_enrollments')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', enrollmentId)
+          .select()
+          .single();
+        
+        if (result.error) {
+          throw result.error;
+        }
+        
+        data = result.data;
+      }
+      
       return data;
     },
     onSuccess: () => {
@@ -320,6 +404,22 @@ export const StudentCourseAssignment: React.FC = () => {
       return;
     }
 
+    // Check for existing enrollments to prevent duplicates
+    const existingEnrollments = enrollments?.filter(e => 
+      e.student_id === selectedStudent.id && 
+      selectedCourses.includes(e.course_id)
+    ) || [];
+
+    if (existingEnrollments.length > 0) {
+      const existingCourseNames = existingEnrollments.map(e => e.course_name).join(', ');
+      toast({
+        title: "Duplicate Enrollment",
+        description: `Student is already enrolled in: ${existingCourseNames}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     assignCourses.mutate({
       studentId: selectedStudent.id,
       courseIds: selectedCourses,
@@ -328,12 +428,15 @@ export const StudentCourseAssignment: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
+    // Ensure status is one of the valid values from the schema
+    const validStatus = ['active', 'inactive', 'pending'].includes(status) ? status : 'pending';
+    
     const badges = {
       active: <Badge className="bg-green-500/20 text-green-400 border-green-500/30">✅ Active</Badge>,
       inactive: <Badge className="bg-red-500/20 text-red-400 border-red-500/30">❌ Inactive</Badge>,
       pending: <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">⏰ Pending</Badge>
     };
-    return badges[status as keyof typeof badges] || badges.pending;
+    return badges[validStatus as keyof typeof badges];
   };
 
   const filteredEnrollments = enrollments?.filter(enrollment => {
@@ -537,42 +640,17 @@ export const StudentCourseAssignment: React.FC = () => {
           </div>
         )}
 
-        {/* Course Assignment Stats */}
-        <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-          <h3 className="text-xl font-semibold text-white mb-4">Course Assignment Statistics</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/20">
-                  <th className="text-gray-400 font-medium p-3">Course</th>
-                  <th className="text-gray-400 font-medium p-3">Instructor</th>
-                  <th className="text-gray-400 font-medium p-3">Total Students</th>
-                  <th className="text-gray-400 font-medium p-3">Active Students</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assignmentStats?.map((stat) => (
-                  <tr key={stat.course_code} className="border-b border-white/10">
-                    <td className="p-3">
-                      <div>
-                        <p className="text-white font-medium">{stat.course_name}</p>
-                        <p className="text-gray-400 text-sm">{stat.course_code}</p>
-                      </div>
-                    </td>
-                    <td className="p-3 text-gray-300">{stat.instructor_name || 'Unassigned'}</td>
-                    <td className="p-3 text-white">{stat.total_students}</td>
-                    <td className="p-3 text-white">{stat.active_students}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        {/* Student Enrollments */}
+        {/* Student Enrollments - Show first when there are search results */}
         {filteredEnrollments && filteredEnrollments.length > 0 && (
           <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Student Enrollments</h3>
+            <h3 className="text-xl font-semibold text-white mb-4">
+              Student Enrollments
+              {searchTerm && (
+                <span className="text-sm text-gray-400 ml-2">
+                  ({filteredEnrollments.length} result{filteredEnrollments.length !== 1 ? 's' : ''} for "{searchTerm}")
+                </span>
+              )}
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -632,6 +710,53 @@ export const StudentCourseAssignment: React.FC = () => {
             </div>
           </Card>
         )}
+
+        {/* Course Assignment Stats - Show after enrollments when there are search results */}
+        <Card className="bg-white/10 backdrop-blur-lg border-white/20 p-6">
+          <h3 className="text-xl font-semibold text-white mb-4">
+            Course Assignment Statistics
+            {searchTerm && (
+              <span className="text-sm text-gray-400 ml-2">
+                ({filteredAssignmentStats.length} course{filteredAssignmentStats.length !== 1 ? 's' : ''} matching "{searchTerm}")
+              </span>
+            )}
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/20">
+                  <th className="text-gray-400 font-medium p-3">Course</th>
+                  <th className="text-gray-400 font-medium p-3">Instructor</th>
+                  <th className="text-gray-400 font-medium p-3">Total Students</th>
+                  <th className="text-gray-400 font-medium p-3">Active Students</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAssignmentStats.length > 0 ? (
+                  filteredAssignmentStats.map((stat) => (
+                    <tr key={stat.course_code} className="border-b border-white/10">
+                      <td className="p-3">
+                        <div>
+                          <p className="text-white font-medium">{stat.course_name}</p>
+                          <p className="text-gray-400 text-sm">{stat.course_code}</p>
+                        </div>
+                      </td>
+                      <td className="p-3 text-gray-300">{stat.instructor_name || 'Unassigned'}</td>
+                      <td className="p-3 text-white">{stat.total_students}</td>
+                      <td className="p-3 text-white">{stat.active_students}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-400">
+                      {searchTerm ? `No courses found matching "${searchTerm}"` : 'No course statistics available'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
         {/* Empty state for filtered results */}
         {filteredEnrollments && filteredEnrollments.length === 0 && enrollments && enrollments.length > 0 && (
@@ -789,7 +914,7 @@ export const StudentCourseAssignment: React.FC = () => {
                         const lecturer = allLecturers?.find(l => l.id === e.target.value);
                         setSelectedLecturer(lecturer || null);
                       }}
-                      className="custom-select"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                     >
                       <option value="">Select a lecturer</option>
                       {filteredLecturers?.map((lecturer) => (
@@ -805,7 +930,7 @@ export const StudentCourseAssignment: React.FC = () => {
                     <select
                       value={selectedLecturerCourse}
                       onChange={e => setSelectedLecturerCourse(e.target.value)}
-                      className="custom-select"
+                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
                     >
                       <option value="">Select a course</option>
                       {courses?.map((course) => (
