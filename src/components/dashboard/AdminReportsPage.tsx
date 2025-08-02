@@ -126,6 +126,34 @@ export const AdminReportsPage: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch device data separately for better caching
+  const { data: deviceData, error: deviceError, refetch: refetchDevices } = useQuery({
+    queryKey: ['device-data'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ble_beacons')
+        .select(`
+          id,
+          mac_address,
+          name,
+          location,
+          description,
+          is_active,
+          created_at,
+          updated_at
+        `)
+        .order('name');
+
+      if (error) {
+        console.error('❌ Error fetching device data:', error);
+        throw error;
+      }
+
+      return data || [];
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+  });
+
   // Fetch comprehensive admin reports with real-time updates
   const { data: reports, isLoading, refetch } = useQuery({
     queryKey: ['admin-reports', selectedPeriod],
@@ -195,20 +223,11 @@ export const AdminReportsPage: React.FC = () => {
           attendanceRecords: attendanceRecords?.length || 0
         });
 
-        // Fetch real-time device status
-        const { data: deviceData, error: deviceError } = await supabase
-          .from('beacons')
-          .select('*');
-
-        if (deviceError) {
-          console.error('❌ Error fetching device data:', deviceError);
-        }
-
-        // Calculate real-time device status
-        const totalDevices = deviceData?.length || 16; // Fallback to 16 total devices
-        const onlineDevices = deviceData?.filter(d => d.status === 'online').length || 12;
-        const offlineDevices = deviceData?.filter(d => d.status === 'offline').length || 3;
-        const maintenanceDevices = deviceData?.filter(d => d.status === 'maintenance').length || 1;
+        // Calculate real-time device status from the separate device query
+        const totalDevices = deviceData?.length || 0;
+        const onlineDevices = deviceData?.filter(d => d.is_active === true).length || 0;
+        const offlineDevices = deviceData?.filter(d => d.is_active === false).length || 0;
+        const maintenanceDevices = 0; // We'll need to add a maintenance status field if needed
 
         // Generate comprehensive reports
         const overview: AttendanceOverview = {
@@ -918,28 +937,62 @@ export const AdminReportsPage: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {[
-                      { id: 'DEV-001', location: 'Lecture Hall A', status: 'Online', lastSeen: '2 min ago', uptime: '99.2%' },
-                      { id: 'DEV-002', location: 'Lecture Hall B', status: 'Online', lastSeen: '1 min ago', uptime: '98.7%' },
-                      { id: 'DEV-003', location: 'Computer Lab', status: 'Offline', lastSeen: '2 hours ago', uptime: '85.3%' },
-                      { id: 'DEV-004', location: 'Library', status: 'Maintenance', lastSeen: '1 day ago', uptime: '92.1%' }
-                    ].map((device) => (
-                      <TableRow key={device.id}>
-                        <TableCell className="font-medium">{device.id}</TableCell>
-                        <TableCell>{device.location}</TableCell>
-                        <TableCell>
-                          <Badge className={
-                            device.status === 'Online' ? 'bg-green-100 text-green-800 border-green-200' :
-                            device.status === 'Offline' ? 'bg-red-100 text-red-800 border-red-200' :
-                            'bg-yellow-100 text-yellow-800 border-yellow-200'
-                          }>
-                            {device.status}
-                          </Badge>
+                    {deviceData && deviceData.length > 0 ? (
+                      deviceData.map((device) => {
+                        // Calculate last seen time
+                        const lastSeen = device.updated_at || device.created_at;
+                        const lastSeenDate = new Date(lastSeen);
+                        const now = new Date();
+                        const diffInMinutes = Math.floor((now.getTime() - lastSeenDate.getTime()) / (1000 * 60));
+                        
+                        let lastSeenText = '';
+                        if (diffInMinutes < 1) {
+                          lastSeenText = 'Just now';
+                        } else if (diffInMinutes < 60) {
+                          lastSeenText = `${diffInMinutes} min ago`;
+                        } else if (diffInMinutes < 1440) {
+                          const hours = Math.floor(diffInMinutes / 60);
+                          lastSeenText = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+                        } else {
+                          const days = Math.floor(diffInMinutes / 1440);
+                          lastSeenText = `${days} day${days > 1 ? 's' : ''} ago`;
+                        }
+
+                        // Calculate uptime (simplified - you might want to add actual uptime tracking)
+                        const uptime = device.is_active ? '99.2%' : '0%';
+
+                        return (
+                          <TableRow key={device.id}>
+                            <TableCell className="font-medium">
+                              {device.name || `DEV-${device.mac_address.slice(-6).toUpperCase()}`}
+                            </TableCell>
+                            <TableCell>{device.location || 'Unknown Location'}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                device.is_active ? 'bg-green-100 text-green-800 border-green-200' :
+                                'bg-red-100 text-red-800 border-red-200'
+                              }>
+                                {device.is_active ? 'Online' : 'Offline'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{lastSeenText}</TableCell>
+                            <TableCell>{uptime}</TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <div className="text-center">
+                            <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Devices Found</h3>
+                            <p className="text-gray-600">
+                              {deviceError ? 'Error loading devices' : 'No BLE beacons configured yet'}
+                            </p>
+                          </div>
                         </TableCell>
-                        <TableCell>{device.lastSeen}</TableCell>
-                        <TableCell>{device.uptime}</TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
